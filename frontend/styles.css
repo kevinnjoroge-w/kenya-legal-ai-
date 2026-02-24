@@ -1474,6 +1474,11 @@ body.chat-focus-mode .footer {
 
     .mode-select {
         font-size: 12px;
+        max-width: 65px;
+        /* Truncates to around 4-5 letters + icon */
+        text-overflow: ellipsis;
+        overflow: hidden;
+        white-space: nowrap;
     }
 
     .filter-bar {
