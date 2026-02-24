@@ -49,8 +49,17 @@ class EmbeddingService:
 
         # Initialize Qdrant client
         if settings.qdrant_api_key:
+            # For Qdrant Cloud: handle both full URLs and hostnames
+            host = settings.qdrant_host
+            if host.startswith(("http://", "https://")):
+                url = host
+            else:
+                # Default to port 443 for Cloud if not specified as 6333
+                port = settings.qdrant_port if settings.qdrant_port != 6333 else 443
+                url = f"https://{host}:{port}"
+
             self.qdrant = QdrantClient(
-                url=f"https://{settings.qdrant_host}:{settings.qdrant_port}",
+                url=url,
                 api_key=settings.qdrant_api_key,
             )
         else:
