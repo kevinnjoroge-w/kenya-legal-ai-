@@ -205,7 +205,24 @@ API docs (Swagger) at **http://localhost:8000/docs**
 }
 ```
 
-**Modes:** `research` · `case_analysis` · `drafting` · `deep_research`
+**Modes:** `research`, `case_analysis`, `drafting`, `deep_research`, `petition_drafting`, `judicial_review`, `devolution`, `cross_reference`, `plain_language`, `swahili`
+
+---
+
+## 🚀 Deployment
+
+### PaaS (Recommended)
+- **Backend (FastAPI + Qdrant):** Deploy to **Render** using the provided `render.yaml` Blueprint.
+- **Frontend (Static):** Deploy to **Vercel** pointing the root to the `frontend` directory.
+- See [paas_deployment_guide.md](file:///home/def/.gemini/antigravity/brain/af50911d-8f2b-4850-9c53-50d97a2e3ae8/paas_deployment_guide.md) for step-by-step instructions.
+
+### Docker
+- Run the entire stack locally or on a VPS:
+  ```bash
+  docker-compose up -d
+  ```
+- See [deployment_guide.md](file:///home/def/.gemini/antigravity/brain/af50911d-8f2b-4850-9c53-50d97a2e3ae8/deployment_guide.md) for VPS setup.
+
 
 ---
 
