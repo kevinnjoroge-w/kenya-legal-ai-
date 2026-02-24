@@ -50,6 +50,7 @@ class Settings(BaseSettings):
     secret_key: str = "change-this-in-production"
     jwt_algorithm: str = "HS256"
     jwt_expiration_hours: int = 24
+    cors_origins: str = "*"
 
     # ── Data Paths ───────────────────────────────────────────────────────
     raw_data_dir: str = "data/raw"
