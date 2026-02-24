@@ -397,8 +397,8 @@ body.chat-focus-mode .main-content {
 .section-container {
     max-width: 1200px;
     margin: 0 auto;
-    padding: 40px 24px 200px;
-    /* Increased for fixed input area */
+    padding: 40px 24px 140px;
+    /* Reduced for a tighter layout */
 }
 
 .section-header {
@@ -1448,8 +1448,8 @@ body.chat-focus-mode .footer {
     }
 
     .section-container {
-        padding-bottom: 160px;
-        /* Reduced for smaller keyboard areas */
+        padding-bottom: 110px;
+        /* Further reduced for mobile */
     }
 
     .chat-messages {
