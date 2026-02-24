@@ -1,0 +1,36 @@
+services:
+  # 1. Backend API Service
+  - type: web
+    name: kenya-legal-ai-api
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn src.api.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: QDRANT_HOST
+        fromService:
+          type: web
+          name: qdrant-db
+          property: host
+      - key: QDRANT_PORT
+        value: 6333
+      # Add other keys like GROQ_API_KEY, LAWS_AFRICA_API_KEY manually in Render Dashboard
+    disk:
+      name: legal-data
+      mountPath: /app/data
+      sizeGB: 10
+
+  # 2. Qdrant Vector Database
+  - type: web
+    name: qdrant-db
+    env: docker
+    dockerContext: .
+    dockerfilePath: Dockerfile.qdrant
+    envVars:
+      - key: QDRANT__STORAGE__PATH
+        value: /qdrant/storage
+    disk:
+      name: qdrant-storage
+      mountPath: /qdrant/storage
+      sizeGB: 10

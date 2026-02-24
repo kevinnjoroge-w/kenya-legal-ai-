@@ -1,0 +1,37 @@
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - APP_ENV=production
+      - QDRANT_HOST=qdrant
+      - QDRANT_PORT=6333
+      # Note: Actual API keys should be in a .env file
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+    depends_on:
+      - qdrant
+    restart: always
+
+  qdrant:
+    image: qdrant/qdrant:v1.12.0
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - ./qdrant_storage:/qdrant/storage
+    restart: always
+  # Optional: Nginx for static file serving and reverse proxy
+  # Useful if you want to serve the frontend separately or add SSL
+  # nginx:
+  #   image: nginx:alpine
+  #   ports:
+  #     - "80:80"
+  #   volumes:
+  #     - ./nginx.conf:/etc/nginx/nginx.conf:ro
+  #     - ./frontend:/usr/share/nginx/html:ro
+  #   depends_on:
+  #     - app

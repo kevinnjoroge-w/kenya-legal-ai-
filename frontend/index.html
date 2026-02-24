@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description"
+        content="Kenya Legal AI - AI-powered legal research assistant for Kenyan law, Constitution, court judgments, and Acts of Parliament">
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚖️</text></svg>">
+    <title>Kenya Legal AI — Intelligent Legal Research</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+
+<body>
+    <!-- ─── Navigation ──────────────────────────────────────────────── -->
+    <nav class="navbar" id="navbar">
+        <div class="nav-container">
+            <a href="#" class="nav-brand">
+                <div class="brand-icon">⚖️</div>
+                <div class="brand-text">
+                    <span class="brand-name">Kenya Legal AI</span>
+                    <span class="brand-tag">Powered by AI</span>
+                </div>
+            </a>
+            <div class="nav-links" id="navLinks">
+                <a href="#chat" class="nav-link active" data-tab="chat">Research Chat</a>
+                <a href="#search" class="nav-link" data-tab="search">Case Search</a>
+                <a href="#constitution" class="nav-link" data-tab="constitution">Constitution</a>
+                <a href="#about" class="nav-link" data-tab="about">About</a>
+            </div>
+            <button class="nav-toggle" id="navToggle" aria-label="Toggle navigation">
+                <span></span><span></span><span></span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- ─── Hero Section ─────────────────────────────────────────────── -->
+    <section class="hero" id="hero">
+        <div class="hero-bg">
+            <div class="hero-gradient"></div>
+            <div class="hero-pattern"></div>
+        </div>
+        <div class="hero-content">
+            <div class="hero-badge">🇰🇪 Built for Kenyan Law</div>
+            <h1 class="hero-title">
+                Your AI-Powered
+                <span class="hero-highlight">Legal Research</span>
+                Assistant
+            </h1>
+            <p class="hero-subtitle">
+                Query the Constitution, Acts of Parliament, and thousands of court judgments
+                with instant, citation-backed answers from Kenya's legal framework.
+            </p>
+            <div class="hero-actions">
+                <button class="btn btn-primary btn-lg" onclick="scrollToChat()">
+                    Start Researching
+                    <span class="btn-arrow">→</span>
+                </button>
+                <button class="btn btn-ghost btn-lg" onclick="switchTab('about')">
+                    Learn More
+                </button>
+            </div>
+            <div class="hero-stats">
+                <div class="stat">
+                    <span class="stat-value">264</span>
+                    <span class="stat-label">Constitutional Articles</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-value">700+</span>
+                    <span class="stat-label">Acts of Parliament</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-value">100K+</span>
+                    <span class="stat-label">Court Judgments</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ─── Main Content Area ─────────────────────────────────────────── -->
+    <main class="main-content">
+
+        <!-- ── Chat Tab ──────────────────────────────────────────────── -->
+        <section class="tab-panel active" id="panel-chat">
+            <div class="section-container">
+                <div class="section-header">
+                    <h2 class="section-title">Legal Research Chat</h2>
+                    <p class="section-desc">Ask any question about Kenyan law and get citation-backed answers</p>
+                </div>
+
+                <div class="chat-container" id="chatContainer">
+                    <!-- Chat Mode Selector -->
+
+                    <!-- Filter Bar -->
+                    <div class="filter-bar">
+                        <div class="filter-group">
+                            <label class="filter-label">Document Type</label>
+                            <select class="filter-select" id="filterDocType">
+                                <option value="">All Sources</option>
+                                <option value="constitution">Constitution</option>
+                                <option value="act">Acts of Parliament</option>
+                                <option value="judgment">Court Judgments</option>
+                                <option value="legal_notice">Legal Notices</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label class="filter-label">Court</label>
+                            <select class="filter-select" id="filterCourt">
+                                <option value="">All Courts</option>
+                                <option value="Supreme Court">Supreme Court</option>
+                                <option value="Court of Appeal">Court of Appeal</option>
+                                <option value="High Court">High Court</option>
+                                <option value="Employment and Labour Relations Court">Employment & Labour Court</option>
+                                <option value="Environment and Land Court">Environment & Land Court</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Chat Messages -->
+                    <div class="chat-messages" id="chatMessages">
+                        <div class="chat-welcome">
+                            <div class="welcome-icon">⚖️</div>
+                            <h3>Welcome to Kenya Legal AI</h3>
+                            <p>Ask me about the Constitution of Kenya, Acts of Parliament, court judgments, or any
+                                aspect of Kenya's legal framework.</p>
+                            <div class="example-queries">
+                                <p class="examples-title">Try asking:</p>
+                                <button class="example-btn" onclick="useExample(this)">What does Article 27 of the
+                                    Constitution say about equality?</button>
+                                <button class="example-btn" onclick="useExample(this)">Explain the rights of an accused
+                                    person under Kenyan law</button>
+                                <button class="example-btn" onclick="useExample(this)">What is the process for
+                                    impeaching a governor in Kenya?</button>
+                                <button class="example-btn" onclick="useExample(this)">Summarize the Employment Act 2007
+                                    provisions on termination</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Chat Input -->
+                    <div class="chat-input-area">
+                        <div class="input-wrapper">
+                            <div class="input-actions-left">
+                                <button class="action-btn" id="navMenuBtn" aria-label="Menu">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <line x1="3" y1="12" x2="21" y2="12"></line>
+                                        <line x1="3" y1="6" x2="21" y2="6"></line>
+                                        <line x1="3" y1="18" x2="21" y2="18"></line>
+                                    </svg>
+                                </button>
+                                <select class="mode-select" id="chatModeSelect">
+                                    <option value="research">🔍 Research</option>
+                                    <option value="case_analysis">📋 Case Analysis</option>
+                                    <option value="drafting">✍️ Drafting</option>
+                                    <option value="deep_research">🎓 Deep Research</option>
+                                    <option value="petition_drafting">🏛️ Petition Drafting</option>
+                                    <option value="judicial_review">⚖️ Judicial Review</option>
+                                    <option value="devolution">🏘️ Devolution Mode</option>
+                                    <option value="cross_reference">🔗 Cross-Reference</option>
+                                    <option value="plain_language">💡 Plain Language</option>
+                                    <option value="swahili">🇰🇪 Swahili Mode</option>
+                                </select>
+                            </div>
+                            <textarea class="chat-input" id="chatInput" placeholder="Ask a legal question..." rows="1"
+                                maxlength="2000"></textarea>
+                            <button class="send-btn" id="sendBtn" onclick="sendMessage()" aria-label="Send message">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M22 2L11 13"></path>
+                                    <path d="M22 2L15 22L11 13L2 9L22 2Z"></path>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="input-footer">
+                            <span class="char-count" id="charCount">0 / 2000</span>
+                            <span class="disclaimer">AI-generated content — not legal advice</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ── Search Tab ────────────────────────────────────────────── -->
+        <section class="tab-panel" id="panel-search">
+            <div class="section-container">
+                <div class="section-header">
+                    <h2 class="section-title">Case Law Search</h2>
+                    <p class="section-desc">Search through thousands of Kenyan court judgments and legal documents</p>
+                </div>
+
+                <div class="search-container">
+                    <div class="search-bar">
+                        <input type="text" class="search-input" id="searchInput"
+                            placeholder="Search case law, statutes, or legal topics...">
+                        <button class="search-btn" onclick="performSearch()">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <circle cx="11" cy="11" r="8"></circle>
+                                <path d="M21 21L16.65 16.65"></path>
+                            </svg>
+                            Search
+                        </button>
+                    </div>
+
+                    <div class="search-filters">
+                        <select class="filter-select" id="searchDocType">
+                            <option value="">All Document Types</option>
+                            <option value="constitution">Constitution</option>
+                            <option value="act">Acts</option>
+                            <option value="judgment">Judgments</option>
+                        </select>
+                        <select class="filter-select" id="searchCourt">
+                            <option value="">All Courts</option>
+                            <option value="Supreme Court">Supreme Court</option>
+                            <option value="Court of Appeal">Court of Appeal</option>
+                            <option value="High Court">High Court</option>
+                        </select>
+                        <select class="filter-select" id="searchResultCount">
+                            <option value="10">10 Results</option>
+                            <option value="20">20 Results</option>
+                            <option value="50">50 Results</option>
+                        </select>
+                    </div>
+
+                    <div class="search-results" id="searchResults">
+                        <div class="search-empty">
+                            <div class="empty-icon">📚</div>
+                            <p>Enter a search query to find relevant legal documents</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ── Constitution Tab ──────────────────────────────────────── -->
+        <section class="tab-panel" id="panel-constitution">
+            <div class="section-container">
+                <div class="section-header">
+                    <h2 class="section-title">Constitution of Kenya 2010</h2>
+                    <p class="section-desc">Search and explore articles of the Constitution</p>
+                </div>
+
+                <div class="constitution-container">
+                    <div class="constitution-search">
+                        <input type="text" class="search-input" id="constitutionInput"
+                            placeholder="Search the Constitution (e.g., 'right to life', 'Article 27')...">
+                        <button class="search-btn" onclick="searchConstitution()">
+                            Search Constitution
+                        </button>
+                    </div>
+
+                    <div class="constitution-chapters">
+                        <h3 class="chapters-title">Quick Navigation</h3>
+                        <div class="chapter-grid">
+                            <button class="chapter-btn" onclick="searchConstitutionTopic('sovereignty of the people')">
+                                <span class="chapter-num">Ch 1</span>
+                                <span class="chapter-name">Sovereignty of the People</span>
+                            </button>
+                            <button class="chapter-btn" onclick="searchConstitutionTopic('the republic')">
+                                <span class="chapter-num">Ch 2</span>
+                                <span class="chapter-name">The Republic</span>
+                            </button>
+                            <button class="chapter-btn" onclick="searchConstitutionTopic('citizenship')">
+                                <span class="chapter-num">Ch 3</span>
+                                <span class="chapter-name">Citizenship</span>
+                            </button>
+                            <button class="chapter-btn" onclick="searchConstitutionTopic('bill of rights')">
+                                <span class="chapter-num">Ch 4</span>
+                                <span class="chapter-name">Bill of Rights</span>
+                            </button>
+                            <button class="chapter-btn" onclick="searchConstitutionTopic('land and environment')">
+                                <span class="chapter-num">Ch 5</span>
+                                <span class="chapter-name">Land & Environment</span>
+                            </button>
+                            <button class="chapter-btn" onclick="searchConstitutionTopic('leadership and integrity')">
+                                <span class="chapter-num">Ch 6</span>
+                                <span class="chapter-name">Leadership & Integrity</span>
+                            </button>
+                            <button class="chapter-btn"
+                                onclick="searchConstitutionTopic('representation of the people')">
+                                <span class="chapter-num">Ch 7</span>
+                                <span class="chapter-name">Representation of the People</span>
+                            </button>
+                            <button class="chapter-btn" onclick="searchConstitutionTopic('the legislature')">
+                                <span class="chapter-num">Ch 8</span>
+                                <span class="chapter-name">The Legislature</span>
+                            </button>
+                            <button class="chapter-btn" onclick="searchConstitutionTopic('the executive')">
+                                <span class="chapter-num">Ch 9</span>
+                                <span class="chapter-name">The Executive</span>
+                            </button>
+                            <button class="chapter-btn" onclick="searchConstitutionTopic('judiciary')">
+                                <span class="chapter-num">Ch 10</span>
+                                <span class="chapter-name">Judiciary</span>
+                            </button>
+                            <button class="chapter-btn" onclick="searchConstitutionTopic('devolved government')">
+                                <span class="chapter-num">Ch 11</span>
+                                <span class="chapter-name">Devolved Government</span>
+                            </button>
+                            <button class="chapter-btn" onclick="searchConstitutionTopic('public finance')">
+                                <span class="chapter-num">Ch 12</span>
+                                <span class="chapter-name">Public Finance</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="constitution-results" id="constitutionResults">
+                        <!-- Results will be rendered here -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ── About Tab ─────────────────────────────────────────────── -->
+        <section class="tab-panel" id="panel-about">
+            <div class="section-container">
+                <div class="section-header">
+                    <h2 class="section-title">About Kenya Legal AI</h2>
+                    <p class="section-desc">Understanding your AI legal research assistant</p>
+                </div>
+
+                <div class="about-container">
+                    <div class="about-grid">
+                        <div class="about-card">
+                            <div class="card-icon">🏛️</div>
+                            <h3>Comprehensive Legal Database</h3>
+                            <p>Access the Constitution of Kenya 2010, 700+ Acts of Parliament, 100,000+ court judgments
+                                from all courts, and Kenya Gazette legal notices.</p>
+                        </div>
+                        <div class="about-card">
+                            <div class="card-icon">🤖</div>
+                            <h3>RAG-Powered AI</h3>
+                            <p>Uses Retrieval-Augmented Generation to ground every response in actual legal documents.
+                                No hallucinations — only verified sources with citations.</p>
+                        </div>
+                        <div class="about-card">
+                            <div class="card-icon">📖</div>
+                            <h3>Citation-Backed Answers</h3>
+                            <p>Every legal claim is backed by specific case citations, constitutional articles, or
+                                statutory provisions with direct source references.</p>
+                        </div>
+                        <div class="about-card">
+                            <div class="card-icon">🔒</div>
+                            <h3>Ethical AI</h3>
+                            <p>Built with legal ethics in mind. Includes mandatory disclaimers, court hierarchy
+                                awareness, and clear delineation of settled vs. debated law.</p>
+                        </div>
+                        <div class="about-card">
+                            <div class="card-icon">⚡</div>
+                            <h3>Three Research Modes</h3>
+                            <p><strong>Research:</strong> General legal Q&A.<br><strong>Case Analysis:</strong> Deep
+                                dive into specific judgments.<br><strong>Drafting:</strong> Generate legal document
+                                templates.</p>
+                        </div>
+                        <div class="about-card">
+                            <div class="card-icon">🇰🇪</div>
+                            <h3>Built for Kenya</h3>
+                            <p>Purpose-built for the Kenyan legal system with understanding of local courts, legal
+                                terminology, and the unique aspects of Kenyan jurisprudence.</p>
+                        </div>
+                    </div>
+
+                    <div class="disclaimer-box">
+                        <h3>⚠️ Important Disclaimer</h3>
+                        <p>Kenya Legal AI is a <strong>legal research tool</strong> and does <strong>not constitute
+                                legal advice</strong>.
+                            Always consult a qualified Kenyan advocate for professional legal guidance. This tool should
+                            be used
+                            as a starting point for research, not as a replacement for professional legal counsel.</p>
+                    </div>
+
+                    <div class="api-status" id="apiStatus">
+                        <h3>System Status</h3>
+                        <div class="status-grid" id="statusGrid">
+                            <div class="status-item">
+                                <span class="status-dot loading"></span>
+                                <span>Checking API status...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- ─── Footer ───────────────────────────────────────────────────── -->
+    <footer class="footer">
+        <div class="footer-container">
+            <div class="footer-brand">
+                <span class="footer-logo">⚖️ Kenya Legal AI</span>
+                <p class="footer-text">AI-powered legal research for the Kenyan legal framework</p>
+            </div>
+            <div class="footer-links">
+                <div class="footer-col">
+                    <h4>Data Sources</h4>
+                    <a href="http://kenyalaw.org" target="_blank" rel="noopener">Kenya Law</a>
+                    <a href="https://laws.africa" target="_blank" rel="noopener">Laws.Africa</a>
+                    <a href="https://judiciary.go.ke" target="_blank" rel="noopener">Judiciary of Kenya</a>
+                </div>
+                <div class="footer-col">
+                    <h4>Resources</h4>
+                    <a href="#" onclick="switchTab('constitution')">Constitution</a>
+                    <a href="#" onclick="switchTab('search')">Case Search</a>
+                    <a href="#" onclick="switchTab('about')">About</a>
+                </div>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p>&copy; 2026 Kenya Legal AI. Not a substitute for professional legal advice.</p>
+        </div>
+    </footer>
+
+    <script src="/static/app.js"></script>
+</body>
+
+</html>
