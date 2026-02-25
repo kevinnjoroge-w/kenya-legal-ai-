@@ -736,6 +736,9 @@ class LegalGenerator:
             logger.info(f"Using Groq ({self.model})")
         elif settings.llm_provider == "google":
             api_key = (settings.google_api_key or "").strip()
+            if not api_key:
+                logger.error("GOOGLE_API_KEY is missing for Gemini LLM.")
+                raise ValueError("GOOGLE_API_KEY is not set in environment variables.")
             self.client = OpenAI(
                 api_key=api_key,
                 base_url="https://generativelanguage.googleapis.com/v1beta/openai/",

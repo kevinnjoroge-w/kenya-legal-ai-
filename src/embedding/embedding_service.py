@@ -42,8 +42,15 @@ class EmbeddingService:
 
         # Initialize appropriate client
         if self.embedding_provider == "openai":
+            if not settings.openai_api_key:
+                raise ValueError("OPENAI_API_KEY is missing in settings")
             self.openai_client = OpenAI(api_key=settings.openai_api_key)
         elif self.embedding_provider == "google":
+            if not settings.google_api_key:
+                logger.error("GOOGLE_API_KEY is missing. Check your .env or production environment variables.")
+                raise ValueError(
+                    "GOOGLE_API_KEY is not set. If you are on Render, add it to your environment variables."
+                )
             genai.configure(api_key=settings.google_api_key)
             self.google_model = settings.embedding_model
 

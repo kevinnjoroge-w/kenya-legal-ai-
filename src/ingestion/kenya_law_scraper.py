@@ -22,7 +22,7 @@ from src.config.settings import get_settings
 logger = logging.getLogger(__name__)
 
 BASE_URL = "https://new.kenyalaw.org"
-CASE_SEARCH_URL = f"{BASE_URL}/judgments/all/"
+CASE_SEARCH_URL = f"{BASE_URL}/judgments/"
 GAZETTE_URL = f"{BASE_URL}/gazettes/"
 
 
@@ -88,7 +88,7 @@ class KenyaLawScraper:
         soup = BeautifulSoup(html, "lxml")
         cases = []
 
-        # The new portal uses a table structure with .cell-title rows
+        # The portal uses a table structure with .cell-title rows
         for row in soup.select("tr:has(td.cell-title)"):
             link_tag = row.select_one("td.cell-title a")
             date_tag = row.select_one("td.cell-date")
@@ -108,7 +108,7 @@ class KenyaLawScraper:
 
     def _parse_case_page(self, html: str, url: str) -> tuple[CaseMetadata, str]:
         """
-        Parse a single case page from the new portal.
+        Parse a single case page from the portal.
         """
         soup = BeautifulSoup(html, "lxml")
 
@@ -139,26 +139,24 @@ class KenyaLawScraper:
                     else:
                         metadata_dict[label] = value
 
-        # Extract judgment body text from .document-content
+        # Extract judgment body text from .document-content or .akn-body
         judgment_text = ""
         content_div = soup.select_one(".document-content")
         if content_div:
-            # Join all spans/paragraphs inside the content area
             judgment_text = content_div.get_text(separator="\n", strip=True)
         else:
-            # Fallback for AKN content
             akn_body = soup.select_one(".akn-body")
             if akn_body:
                 judgment_text = akn_body.get_text(separator="\n", strip=True)
 
         metadata = CaseMetadata(
-            case_number=metadata_dict["Case number"],
+            case_number=metadata_dict.get("Case number", ""),
             title=title or metadata_dict.get("Title", "Unknown Case"),
-            court=metadata_dict["Court"],
-            date=metadata_dict["Judgment date"],
-            judges=metadata_dict["Judges"],
+            court=metadata_dict.get("Court", ""),
+            date=metadata_dict.get("Judgment date", ""),
+            judges=metadata_dict.get("Judges", []),
             parties=[],
-            citation=metadata_dict["Citation"],
+            citation=metadata_dict.get("Citation", ""),
             url=url,
             categories=[],
         )
@@ -168,9 +166,6 @@ class KenyaLawScraper:
     async def scrape_case(self, case_url: str) -> Optional[dict]:
         """
         Scrape a single case page.
-
-        Returns:
-            Dictionary with case metadata and saved file paths
         """
         try:
             html = await self._fetch_page(case_url)
@@ -181,8 +176,8 @@ class KenyaLawScraper:
                 return None
 
             # Create safe filename
-            safe_name = re.sub(r"[^\w\-]", "_", metadata.case_number or metadata.title)
-            safe_name = safe_name[:100]  # Limit filename length
+            safe_id = metadata.case_number or metadata.citation or metadata.title
+            safe_name = re.sub(r"[^\w\-]", "_", safe_id)[:100]
             case_dir = self.cases_dir / safe_name
             case_dir.mkdir(parents=True, exist_ok=True)
 
@@ -196,12 +191,7 @@ class KenyaLawScraper:
                 json.dumps(asdict(metadata), indent=2, ensure_ascii=False)
             )
 
-            # Save raw HTML
-            html_path = case_dir / "raw.html"
-            html_path.write_text(html, encoding="utf-8")
-
             metadata.source_file = str(text_path)
-
             logger.info(f"Scraped case: {metadata.title[:60]}...")
 
             return {
@@ -219,46 +209,37 @@ class KenyaLawScraper:
         query: str = "",
         court: str = "",
         year: Optional[int] = None,
-        max_pages: int = 5,
+        page: int = 1,
     ) -> list[dict]:
         """
-        Search case law on Kenya Law.
+        Search case law on Kenya Law with support for the new portal's filters.
 
         Args:
-            query: Search query
-            court: Filter by court name
-            year: Filter by year
-            max_pages: Maximum number of result pages to scrape
-
-        Returns:
-            List of case listing dictionaries with url and title
+            query: Search query (q)
+            court: Filter by court (courts) - e.g. 'supreme-court'
+            year: Filter by year (year)
+            page: Specific page to fetch
         """
-        all_cases = []
+        params = []
+        if query:
+            params.append(f"q={query}")
+        if court:
+            params.append(f"courts={court}")
+        if year:
+            params.append(f"year={year}")
+        if page > 1:
+            params.append(f"page={page}")
 
-        for page in range(1, max_pages + 1):
-            params = f"?q={query}&court={court}&page={page}"
-            if year:
-                params += f"&year={year}"
+        query_string = "?" + "&".join(params) if params else ""
+        url = f"{CASE_SEARCH_URL}{query_string}"
 
-            url = f"{CASE_SEARCH_URL}{params}"
-
-            try:
-                html = await self._fetch_page(url)
-                cases = self._parse_case_listing(html)
-
-                if not cases:
-                    logger.info(f"No more results at page {page}")
-                    break
-
-                all_cases.extend(cases)
-                logger.info(f"Page {page}: found {len(cases)} cases")
-
-            except Exception as e:
-                logger.error(f"Search page {page} failed: {e}")
-                break
-
-        logger.info(f"Total cases found: {len(all_cases)}")
-        return all_cases
+        try:
+            html = await self._fetch_page(url)
+            cases = self._parse_case_listing(html)
+            return cases
+        except Exception as e:
+            logger.error(f"Search failed for {url}: {e}")
+            return []
 
     async def scrape_gazettes(self, year: int, max_pages: int = 5) -> list[dict]:
         """Scrape Kenya Gazette notices for a specific year."""

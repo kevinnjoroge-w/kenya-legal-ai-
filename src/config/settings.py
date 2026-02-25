@@ -62,6 +62,7 @@ class Settings(BaseSettings):
     chunk_overlap: int = 200        # overlap between chunks
     retrieval_top_k: int = 10       # number of chunks to retrieve
     rerank_top_k: int = 5           # number of chunks after re-ranking
+    retrieval_threshold: float = 0.35 # minimum score to consider a chunk relevant
 
     class Config:
         env_file = ".env"

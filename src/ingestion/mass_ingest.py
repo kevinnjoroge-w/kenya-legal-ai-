@@ -47,19 +47,21 @@ async def run_mass_ingestion():
     # 2. Kenya Law (Bulk Scrape: Judgments & Gazettes)
     logger.info("--- Starting Kenya Law Bulk Ingestion ---")
     kl_scraper = KenyaLawScraper()
-    years = range(2020, 2027) # 2020 to 2026
+    years = range(2024, 2027) # Focus on recent gazettes
     
     for year in years:
-        logger.info(f"Processing year {year}")
-        # Fetch Gazettes
+        logger.info(f"Processing year {year} gazettes")
         gazettes = await kl_scraper.scrape_gazettes(year=year)
-        for g in gazettes[:100]: # Top 20 gazettes per year
+        for g in gazettes[:20]: # Top 20 gazettes per year
             await kl_scraper.scrape_document_full(g)
-            
-        # Optional: Add judgments too
-        # cases = await kl_scraper.search_cases(year=year, page_limit=1)
-        # for c in cases[:10]:
-        #     await kl_scraper.scrape_case(c['url'])
+
+    # 2.5. Mass Judgment Ingestion (New Bulk Scraper)
+    from src.ingestion.bulk_judgment_scraper import BulkJudgmentScraper
+    logger.info("--- Starting Mass Judgment Ingestion ---")
+    bulk_scraper = BulkJudgmentScraper()
+    # Starting a full-scale ingestion run (500 pages per category)
+    # The checkpoint system allows this to be resumed in future runs.
+    await bulk_scraper.run_bulk_scrape(limit_pages=500)
 
     # 3. Laws.Africa Ingestion (bulk legislation)
     logger.info("--- Starting Laws.Africa Bulk Ingestion ---")

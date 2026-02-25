@@ -176,7 +176,20 @@ class RetrievalPipeline:
             reverse=True,
         )
 
-        # Step 6: Take rerank_top_k
+        # Step 6: Filter by relevance threshold and take rerank_top_k
+        threshold = self.settings.retrieval_threshold
+        
+        # Check if the BEST result meets the threshold. 
+        # If the top result is junk, the rest likely are too.
+        if results and results[0].get("adjusted_score", results[0]["score"]) < threshold:
+            logger.info(f"Top result score {results[0]['score']:.4f} is below threshold {threshold}. Returning empty.")
+            return []
+
+        # Filter the list
+        results = [
+            r for r in results 
+            if r.get("adjusted_score", r["score"]) >= threshold
+        ]
         results = results[:self.settings.rerank_top_k]
 
         logger.info(
