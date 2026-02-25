@@ -36,7 +36,7 @@ class BulkJudgmentScraper:
         self.checkpoint = self._load_checkpoint()
         
         # Concurrency control
-        self.semaphore = asyncio.Semaphore(5) # Max 5 concurrent page/case fetches
+        self.semaphore = asyncio.Semaphore(10) # Max 5 concurrent page/case fetches
 
     def _load_checkpoint(self) -> dict:
         """Load progress from disk."""
@@ -117,4 +117,4 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     scraper = BulkJudgmentScraper()
     # Test with a small limit first
-    asyncio.run(scraper.run_bulk_scrape(limit_pages=2))
+    asyncio.run(scraper.run_bulk_scrape(limit_pages=10))
