@@ -66,12 +66,25 @@ STYLE_BY_MODE = {
     "research": """
         Answer this like you're explaining it to a colleague over coffee — 
         direct, confident, with the important nuances called out naturally. 
-        No section headers unless the answer genuinely needs them.
+        When you retrieve sources, synthesize them — don't list them. 
+        Never say "Source [N] says" or "the provided sources indicate." 
+        Instead say "the Land Act 2012" or "in Mitu-Bell v Kenya Airports Authority."
+        If your sources don't cover the question well, say so in one sentence 
+        then answer from your legal knowledge directly.
+        
+        Never write section headers for a conversational research response.
+        Never write an introduction paragraph — start with the substance.
+        Never summarize at the end what you just said.
+        
+        End with either a follow-up question that would help narrow the analysis,
+        or flag the most practically important thing the person should know.
     """,
     "case_analysis": """
         Analyse this case the way you'd prepare a memo for a partner — 
         sharp, opinionated where the law allows opinions, and honest about 
         where the judgment is weak or where you'd have argued differently.
+        Structure your analysis with clear headings like: Introduction, Judicial Application, 
+        Practical Effect, and Unsettled Areas.
     """,
     "drafting": """
         Draft this like a careful draftsman who also understands why each 
@@ -135,16 +148,10 @@ QUERY_TEMPLATE = """\
 {query}
 
 ## Response Instructions:
-- Use the provided sources as your primary foundation, citing them with [Source N].
+- Use the provided sources as your primary foundation. Synthesize the law naturally.
 - If the sources are missing key information (like a major Constitutional article), seamlessly supplement with your own expert knowledge. Do not complain that the sources are missing.
-- Open with the most directly relevant statutory provision or constitutional \
-  article (quote the exact text).
+- Open with the actual legal position, not a throat-clearing introduction paragraph.
 - Trace the full precedent chain visible in the sources or your knowledge.
-- Provide a multi-angle analysis: legal text → judicial application → \
-  practical effect → unsettled areas.
-- Use headings to structure complex answers.
-- End with 1–2 sentences summarising the most critical point for a \
-  non-lawyer to understand.
 
 ## Answer:"""
 

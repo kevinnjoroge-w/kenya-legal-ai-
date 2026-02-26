@@ -11,6 +11,7 @@ from src.ingestion.judiciary_scraper import JudiciaryScraper
 from src.ingestion.laws_africa_client import LawsAfricaClient
 from src.ingestion.eac_ingestor import EACIngestor
 from src.ingestion.lsk_scraper import LSKScraper
+from src.ingestion.cipit_scraper import CIPITScraper
 from src.processing.document_processor import process_all_documents
 from src.embedding.embedding_service import EmbeddingService
 from src.processing.document_processor import LegalDocumentProcessor
@@ -71,6 +72,14 @@ async def run_mass_ingestion():
         await lsk_scraper.ingest_all()
     except Exception as e:
         logger.error(f"LSK Ingestion failed: {e}")
+
+    # 2.7. CIPIT Data Protection Case Law Ingestion
+    logger.info("--- Starting CIPIT Ingestion ---")
+    cipit_scraper = CIPITScraper()
+    try:
+        await cipit_scraper.ingest_all()
+    except Exception as e:
+        logger.error(f"CIPIT Ingestion failed: {e}")
 
     # 3. Laws.Africa Ingestion (bulk legislation)
     logger.info("--- Starting Laws.Africa Bulk Ingestion ---")

@@ -353,6 +353,33 @@ class LegalDocumentProcessor:
             metadata={"title": title, "filename": pdf_path.name},
         )
 
+    def process_cipit_file(self, filepath: Path) -> list[DocumentChunk]:
+        """Process a CIPIT document (PDF or HTML) into chunks."""
+        if not filepath.exists():
+            return []
+            
+        is_pdf = filepath.suffix.lower() == ".pdf"
+        
+        if is_pdf:
+            text = self.extract_text_from_pdf(filepath)
+        else:
+            from bs4 import BeautifulSoup
+            html = filepath.read_text(encoding="utf-8")
+            soup = BeautifulSoup(html, "lxml")
+            text = soup.get_text(separator="\n", strip=True)
+            
+        title = filepath.stem.replace("-", " ").replace("_", " ")
+        doc_id = self._generate_document_id("cipit", filepath.stem)
+        
+        return self.chunk_document(
+            text=text,
+            document_id=doc_id,
+            document_title=title,
+            document_type="judgment",
+            source="cipit",
+            metadata={"title": title, "filename": filepath.name},
+        )
+
 
 def process_all_documents():
     """Process all downloaded raw documents into chunks."""
@@ -408,6 +435,14 @@ def process_all_documents():
         for pdf_path in lsk_dir.glob("*.pdf"):
             chunks = processor.process_lsk_file(pdf_path)
             all_chunks.extend(chunks)
+
+    # Process CIPIT documents
+    cipit_dir = Path(settings.raw_data_dir) / "cipit"
+    if cipit_dir.exists():
+        for filepath in cipit_dir.iterdir():
+            if filepath.is_file() and filepath.suffix in [".pdf", ".html"]:
+                chunks = processor.process_cipit_file(filepath)
+                all_chunks.extend(chunks)
 
     # Save all chunks
     if all_chunks:
