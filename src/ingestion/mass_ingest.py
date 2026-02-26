@@ -10,6 +10,7 @@ from src.ingestion.kenya_law_scraper import KenyaLawScraper
 from src.ingestion.judiciary_scraper import JudiciaryScraper
 from src.ingestion.laws_africa_client import LawsAfricaClient
 from src.ingestion.eac_ingestor import EACIngestor
+from src.ingestion.lsk_scraper import LSKScraper
 from src.processing.document_processor import process_all_documents
 from src.embedding.embedding_service import EmbeddingService
 from src.processing.document_processor import LegalDocumentProcessor
@@ -62,6 +63,14 @@ async def run_mass_ingestion():
     # Starting a full-scale ingestion run (500 pages per category)
     # The checkpoint system allows this to be resumed in future runs.
     await bulk_scraper.run_bulk_scrape(limit_pages=500)
+
+    # 2.6. Law Society of Kenya (LSK) Ingestion
+    logger.info("--- Starting LSK Ingestion ---")
+    lsk_scraper = LSKScraper()
+    try:
+        await lsk_scraper.ingest_all()
+    except Exception as e:
+        logger.error(f"LSK Ingestion failed: {e}")
 
     # 3. Laws.Africa Ingestion (bulk legislation)
     logger.info("--- Starting Laws.Africa Bulk Ingestion ---")

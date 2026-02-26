@@ -334,6 +334,25 @@ class LegalDocumentProcessor:
             metadata=metadata,
         )
 
+    def process_lsk_file(self, pdf_path: Path) -> list[DocumentChunk]:
+        """Process an LSK document (PDF only, no metadata) into chunks."""
+        if not pdf_path.exists():
+            return []
+            
+        text = self.extract_text_from_pdf(pdf_path)
+        
+        title = pdf_path.stem.replace("-", " ").replace("_", " ")
+        doc_id = self._generate_document_id("lsk", pdf_path.stem)
+        
+        return self.chunk_document(
+            text=text,
+            document_id=doc_id,
+            document_title=title,
+            document_type="guideline",
+            source="lsk",
+            metadata={"title": title, "filename": pdf_path.name},
+        )
+
 
 def process_all_documents():
     """Process all downloaded raw documents into chunks."""
@@ -382,6 +401,13 @@ def process_all_documents():
                     c.source = "kenya_law"
                     c.document_type = "legal_notice"
                 all_chunks.extend(chunks)
+
+    # Process LSK documents
+    lsk_dir = Path(settings.raw_data_dir) / "lsk"
+    if lsk_dir.exists():
+        for pdf_path in lsk_dir.glob("*.pdf"):
+            chunks = processor.process_lsk_file(pdf_path)
+            all_chunks.extend(chunks)
 
     # Save all chunks
     if all_chunks:

@@ -53,10 +53,13 @@ you skip the basics. Read the room.\
 # Used in RAG mode
 RAG_SYSTEM_PROMPT = SYSTEM_PROMPT + """
 
-GROUNDING RULE: Your analysis must be anchored in the provided source documents. 
-Every factual or legal claim you make must cite a [Source N] reference. Do not 
-invent citations or case names — if the sources do not cover a point, say so 
-explicitly and flag it clearly.\
+INTEGRATION RULE: You will be provided with retrieved legal sources. You must 
+prioritize and cite these sources ([Source N]) whenever applicable. However, 
+you are a senior advocate — you already know the Constitution and major Acts. 
+If the retrieved sources do not cover a necessary point (e.g., a specific Article 
+of the Constitution), DO NOT apologize or state that the sources are missing. 
+Seamlessly integrate your own expert knowledge of Kenyan law to provide a complete 
+analysis.\
 """
 
 STYLE_BY_MODE = {
@@ -132,16 +135,14 @@ QUERY_TEMPLATE = """\
 {query}
 
 ## Response Instructions:
-- Base your answer ONLY on the provided sources above.
-- Cite each source using [Source N] for every legal claim.
+- Use the provided sources as your primary foundation, citing them with [Source N].
+- If the sources are missing key information (like a major Constitutional article), seamlessly supplement with your own expert knowledge. Do not complain that the sources are missing.
 - Open with the most directly relevant statutory provision or constitutional \
   article (quote the exact text).
-- Trace the full precedent chain visible in the sources.
+- Trace the full precedent chain visible in the sources or your knowledge.
 - Provide a multi-angle analysis: legal text → judicial application → \
   practical effect → unsettled areas.
 - Use headings to structure complex answers.
-- If the sources are insufficient to fully answer the question, clearly state \
-  what is covered and what requires further research.
 - End with 1–2 sentences summarising the most critical point for a \
   non-lawyer to understand.
 
