@@ -44,6 +44,8 @@ class Settings(BaseSettings):
     qdrant_port: int = 6333
     qdrant_collection: str = "kenya_legal_docs"
     qdrant_api_key: str = ""
+    qdrant_cloud_host: str = ""
+    qdrant_cloud_api_key: str = ""
 
     # ── PostgreSQL ───────────────────────────────────────────────────────
     database_url: str = "postgresql://user:password@localhost:5432/kenya_legal_ai"

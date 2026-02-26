@@ -76,6 +76,13 @@ class EmbeddingService:
             )
 
         self.collection_name = settings.qdrant_collection
+        
+        self.qdrant_cloud = None
+        if hasattr(settings, "qdrant_cloud_host") and settings.qdrant_cloud_host and hasattr(settings, "qdrant_cloud_api_key") and settings.qdrant_cloud_api_key:
+            self.qdrant_cloud = QdrantClient(
+                url=settings.qdrant_cloud_host,
+                api_key=settings.qdrant_cloud_api_key,
+            )
 
     def ensure_collection(self):
         """Create the Qdrant collection if it doesn't exist."""
@@ -96,6 +103,20 @@ class EmbeddingService:
             )
         else:
             logger.info(f"Collection '{self.collection_name}' already exists")
+
+        # Do the same for Cloud if configured
+        if self.qdrant_cloud:
+            collections_cloud = self.qdrant_cloud.get_collections().collections
+            exists_cloud = any(c.name == self.collection_name for c in collections_cloud)
+            if not exists_cloud:
+                self.qdrant_cloud.create_collection(
+                    collection_name=self.collection_name,
+                    vectors_config=VectorParams(
+                        size=self.embedding_dimension,
+                        distance=Distance.COSINE,
+                    ),
+                )
+                logger.info(f"Created Cloud Qdrant collection '{self.collection_name}'")
 
     def generate_embedding(self, text: str) -> list[float]:
         """
@@ -224,6 +245,13 @@ class EmbeddingService:
                 collection_name=self.collection_name,
                 points=points,
             )
+            
+            # Upsert to Cloud Qdrant
+            if self.qdrant_cloud:
+                self.qdrant_cloud.upsert(
+                    collection_name=self.collection_name,
+                    points=points,
+                )
             
             # Small delay between batches to respect rate limits
             if self.embedding_provider == "google":
