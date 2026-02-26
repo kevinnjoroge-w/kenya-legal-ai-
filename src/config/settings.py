@@ -23,6 +23,8 @@ class Settings(BaseSettings):
     # ── LLM Provider ─────────────────────────────────────────────────────
     llm_provider: str = Field(default="groq", pattern="^(openai|anthropic|ollama|google|groq)$")
     llm_model: str = "llama-3.3-70b-versatile"
+    llm_temperature: float = 0.4
+    drafting_temperature: float = 0.2
     openai_api_key: str = ""
     anthropic_api_key: str = ""
     google_api_key: str = ""
