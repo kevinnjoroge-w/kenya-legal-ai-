@@ -11,6 +11,12 @@ import time
 from dataclasses import asdict
 from pathlib import Path
 from typing import Optional
+import os
+
+try:
+    from sentence_transformers import SentenceTransformer
+except ImportError:
+    SentenceTransformer = None
 
 from openai import OpenAI
 import google.generativeai as genai
@@ -53,6 +59,13 @@ class EmbeddingService:
                 )
             genai.configure(api_key=settings.google_api_key)
             self.google_model = settings.embedding_model
+        elif self.embedding_provider == "huggingface":
+            if SentenceTransformer is None:
+                raise ImportError(
+                    "sentence-transformers is not installed. Please run: pip install sentence-transformers"
+                )
+            logger.info(f"Loading HuggingFace model: {settings.embedding_model}")
+            self.hf_model = SentenceTransformer(settings.embedding_model)
 
         # Initialize Qdrant client
         if settings.qdrant_api_key:
@@ -73,6 +86,7 @@ class EmbeddingService:
             self.qdrant = QdrantClient(
                 host=settings.qdrant_host,
                 port=settings.qdrant_port,
+                timeout=60.0,
             )
 
         self.collection_name = settings.qdrant_collection
@@ -82,6 +96,7 @@ class EmbeddingService:
             self.qdrant_cloud = QdrantClient(
                 url=settings.qdrant_cloud_host,
                 api_key=settings.qdrant_cloud_api_key,
+                timeout=60.0,
             )
 
     def ensure_collection(self):
@@ -141,6 +156,8 @@ class EmbeddingService:
                 task_type="retrieval_document",
             )
             return result["embedding"]
+        elif self.embedding_provider == "huggingface" and self.hf_model:
+            return self.hf_model.encode(text).tolist()
         return []
 
     def generate_embeddings_batch(
@@ -195,6 +212,11 @@ class EmbeddingService:
                             raise e
             return all_embeddings
             
+        elif self.embedding_provider == "huggingface" and self.hf_model:
+            logger.info(f"Embedding {len(texts)} texts with HuggingFace ({settings.embedding_model})")
+            embeddings = self.hf_model.encode(texts, batch_size=batch_size, show_progress_bar=False)
+            return embeddings.tolist()
+            
         return []
 
     def index_chunks(self, chunks: list[DocumentChunk], batch_size: int = 50):
@@ -241,17 +263,23 @@ class EmbeddingService:
                 )
 
             # Upsert to Qdrant
-            self.qdrant.upsert(
-                collection_name=self.collection_name,
-                points=points,
-            )
-            
-            # Upsert to Cloud Qdrant
-            if self.qdrant_cloud:
-                self.qdrant_cloud.upsert(
+            try:
+                self.qdrant.upsert(
                     collection_name=self.collection_name,
                     points=points,
                 )
+            except Exception as e:
+                logger.error(f"Failed to upsert to local Qdrant: {e}")
+            
+            # Upsert to Cloud Qdrant
+            if self.qdrant_cloud:
+                try:
+                    self.qdrant_cloud.upsert(
+                        collection_name=self.collection_name,
+                        points=points,
+                    )
+                except Exception as e:
+                    logger.error(f"Failed to upsert to Cloud Qdrant: {e}")
             
             # Small delay between batches to respect rate limits
             if self.embedding_provider == "google":
