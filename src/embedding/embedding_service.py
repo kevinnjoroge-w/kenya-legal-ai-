@@ -19,7 +19,7 @@ except ImportError:
     SentenceTransformer = None
 
 from openai import OpenAI
-import google.generativeai as genai
+from google import genai
 from qdrant_client import QdrantClient
 from qdrant_client.models import (
     Distance,
@@ -57,7 +57,7 @@ class EmbeddingService:
                 raise ValueError(
                     "GOOGLE_API_KEY is not set. If you are on Render, add it to your environment variables."
                 )
-            genai.configure(api_key=settings.google_api_key)
+            self.google_client = genai.Client(api_key=settings.google_api_key)
             self.google_model = settings.embedding_model
         elif self.embedding_provider == "huggingface":
             if SentenceTransformer is None:
@@ -69,20 +69,30 @@ class EmbeddingService:
 
         # Initialize Qdrant client
         if settings.qdrant_api_key:
-            # For Qdrant Cloud: handle both full URLs and hostnames
+            # For Qdrant Cloud or remote instances with API key
             host = settings.qdrant_host
             if host.startswith(("http://", "https://")):
                 url = host
             else:
-                # Default to port 443 for Cloud if not specified as 6333
-                port = settings.qdrant_port if settings.qdrant_port != 6333 else 443
-                url = f"https://{host}:{port}"
+                # If it's localhost, use http and specified port
+                if host == "localhost" or host == "127.0.0.1":
+                    protocol = "http"
+                    port = settings.qdrant_port
+                else:
+                    # Default to https and port 443 for Cloud if not specified as 6333
+                    protocol = "https"
+                    port = settings.qdrant_port if settings.qdrant_port != 6333 else 443
+                
+                url = f"{protocol}://{host}:{port}"
 
+            logger.info(f"Connecting to Qdrant at {url} (with API key)")
             self.qdrant = QdrantClient(
                 url=url,
                 api_key=settings.qdrant_api_key,
+                timeout=60.0,
             )
         else:
+            logger.info(f"Connecting to Qdrant at {settings.qdrant_host}:{settings.qdrant_port} (no API key)")
             self.qdrant = QdrantClient(
                 host=settings.qdrant_host,
                 port=settings.qdrant_port,
@@ -150,12 +160,14 @@ class EmbeddingService:
             )
             return response.data[0].embedding
         elif self.embedding_provider == "google":
-            result = genai.embed_content(
+            result = self.google_client.models.embed_content(
                 model=self.google_model,
-                content=text,
-                task_type="retrieval_document",
+                contents=text,
+                config={
+                    "task_type": "retrieval_document"
+                }
             )
-            return result["embedding"]
+            return result.embeddings[0].values
         elif self.embedding_provider == "huggingface" and self.hf_model:
             return self.hf_model.encode(text).tolist()
         return []
@@ -195,12 +207,15 @@ class EmbeddingService:
                 max_retries = 3
                 for attempt in range(max_retries):
                     try:
-                        result = genai.embed_content(
+                        result = self.google_client.models.embed_content(
                             model=self.google_model,
-                            content=batch,
-                            task_type="retrieval_document",
+                            contents=batch,
+                            config={
+                                "task_type": "retrieval_document"
+                            }
                         )
-                        all_embeddings.extend(result["embedding"])
+                        batch_embeddings = [e.values for e in result.embeddings]
+                        all_embeddings.extend(batch_embeddings)
                         logger.info(f"Embedded Google batch {i // batch_size + 1}")
                         break
                     except Exception as e:
@@ -211,9 +226,10 @@ class EmbeddingService:
                         else:
                             raise e
             return all_embeddings
+
             
         elif self.embedding_provider == "huggingface" and self.hf_model:
-            logger.info(f"Embedding {len(texts)} texts with HuggingFace ({settings.embedding_model})")
+            logger.info(f"Embedding {len(texts)} texts with HuggingFace ({self.embedding_model})")
             embeddings = self.hf_model.encode(texts, batch_size=batch_size, show_progress_bar=False)
             return embeddings.tolist()
             
@@ -334,13 +350,28 @@ class EmbeddingService:
 
         search_filter = Filter(must=conditions) if conditions else None
 
-        # Search Qdrant
-        results = self.qdrant.search(
-            collection_name=self.collection_name,
-            query_vector=query_embedding,
-            limit=top_k,
-            query_filter=search_filter,
-        )
+        # Search Qdrant — guard against vector dimension mismatches which would
+        # otherwise bubble up as a 500 error.  When the embedding model's output
+        # dimension differs from the stored collection dimension (e.g. during a
+        # model migration) we return an empty list so the generator can fall
+        # back to direct LLM mode instead of crashing the request.
+        try:
+            results = self.qdrant.search(
+                collection_name=self.collection_name,
+                query_vector=query_embedding,
+                limit=top_k,
+                query_filter=search_filter,
+            )
+        except Exception as e:
+            err_msg = str(e)
+            if "Vector dimension error" in err_msg or "Wrong input" in err_msg:
+                logger.warning(
+                    f"Vector dimension mismatch — returning empty results. "
+                    f"Collection expects a different dimension than the current "
+                    f"embedding model produces. Error: {err_msg}"
+                )
+                return []
+            raise  # re-raise any other unexpected Qdrant error
 
         return [
             {

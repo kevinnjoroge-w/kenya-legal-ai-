@@ -31,9 +31,12 @@ class Settings(BaseSettings):
     groq_api_key: str = ""
 
     # ── Embeddings ───────────────────────────────────────────────────────
-    embedding_provider: str = Field(default="google", pattern="^(openai|google)$")
-    embedding_model: str = "all-mpnet-base-v2"
-    embedding_dimension: int = 768  # text-embedding-004 dimension
+    embedding_provider: str = Field(default="google", pattern="^(openai|google|huggingface)$")
+    # models/gemini-embedding-001 is the current Google embedding model → 3072-dim output.
+    # IMPORTANT: If you change this model, verify the dimension matches EMBEDDING_DIMENSION
+    # and the existing Qdrant collection, otherwise all searches will fail.
+    embedding_model: str = "models/gemini-embedding-001"
+    embedding_dimension: int = 3072  # must match the Qdrant collection dimension
 
     # ── Data Sources ─────────────────────────────────────────────────────
     laws_africa_api_key: str = ""
