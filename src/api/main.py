@@ -380,12 +380,17 @@ if FRONTEND_DIR.exists():
 
     app.mount("/static", StaticFiles(directory=str(FRONTEND_DIR)), name="static")
 
-    @app.get("/app/{path:path}")
+    @app.get("/{path:path}", include_in_schema=False)
     async def serve_frontend_files(path: str):
-        """Serve frontend static files."""
+        """Serve frontend static files (e.g. styles.css, app.js)."""
         file_path = FRONTEND_DIR / path
         if file_path.exists() and file_path.is_file():
             return FileResponse(file_path)
+        # If it doesn't exist, fallback to index.html for SPA routing, 
+        # but only if it doesn't look like an API request or missing asset
+        if path.startswith("api/") or "." in path:
+            from fastapi import Response
+            return Response(status_code=404)
         return FileResponse(FRONTEND_DIR / "index.html")
 
 

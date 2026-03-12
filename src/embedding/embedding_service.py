@@ -59,6 +59,15 @@ class EmbeddingService:
                 )
             genai.configure(api_key=settings.google_api_key)
             self.google_model = settings.embedding_model
+        elif self.embedding_provider == "cohere":
+            if not settings.cohere_api_key:
+                logger.error("COHERE_API_KEY is missing. Check your .env file.")
+                raise ValueError("COHERE_API_KEY is not set.")
+            try:
+                import cohere
+                self.cohere_client = cohere.ClientV2(api_key=settings.cohere_api_key)
+            except ImportError:
+                raise ImportError("cohere package is not installed. Run: pip install cohere")
         elif self.embedding_provider == "huggingface":
             if SentenceTransformer is None:
                 raise ImportError(
@@ -156,6 +165,14 @@ class EmbeddingService:
                 task_type="retrieval_document",
             )
             return result["embedding"]
+        elif self.embedding_provider == "cohere":
+            response = self.cohere_client.embed(
+                texts=[text],
+                model=self.embedding_model,
+                input_type="search_document",
+                embedding_types=["float"]
+            )
+            return response.embeddings.float_[0]
         elif self.embedding_provider == "huggingface" and self.hf_model:
             return self.hf_model.encode(text).tolist()
         return []
@@ -207,6 +224,33 @@ class EmbeddingService:
                         if "429" in str(e) and attempt < max_retries - 1:
                             wait_time = 60  # Wait a full minute if rate limited
                             logger.warning(f"Rate limited. Waiting {wait_time}s before retry...")
+                            time.sleep(wait_time)
+                        else:
+                            raise e
+        elif self.embedding_provider == "cohere":
+            all_embeddings = []
+            # Cohere allows up to 96 inputs per batch call
+            cohere_batch = min(batch_size, 96)
+            for i in range(0, len(texts), cohere_batch):
+                batch = texts[i : i + cohere_batch]
+                
+                max_retries = 3
+                for attempt in range(max_retries):
+                    try:
+                        response = self.cohere_client.embed(
+                            texts=batch,
+                            model=self.embedding_model,
+                            input_type="search_document",
+                            embedding_types=["float"]
+                        )
+                        all_embeddings.extend(response.embeddings.float_)
+                        logger.info(f"Embedded Cohere batch {i // cohere_batch + 1}")
+                        time.sleep(1) # Small delay to respect 10k/min ratelimits
+                        break
+                    except Exception as e:
+                        if attempt < max_retries - 1:
+                            wait_time = 5 * (attempt + 1)
+                            logger.warning(f"Cohere API error, waiting {wait_time}s... ({e})")
                             time.sleep(wait_time)
                         else:
                             raise e

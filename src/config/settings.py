@@ -31,9 +31,10 @@ class Settings(BaseSettings):
     groq_api_key: str = ""
 
     # ── Embeddings ───────────────────────────────────────────────────────
-    embedding_provider: str = Field(default="google", pattern="^(openai|google)$")
+    embedding_provider: str = Field(default="google", pattern="^(openai|google|cohere)$")
     embedding_model: str = "all-mpnet-base-v2"
     embedding_dimension: int = 768  # text-embedding-004 dimension
+    cohere_api_key: str = ""
 
     # ── Data Sources ─────────────────────────────────────────────────────
     laws_africa_api_key: str = ""
