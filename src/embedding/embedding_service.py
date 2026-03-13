@@ -142,6 +142,40 @@ class EmbeddingService:
                 )
                 logger.info(f"Created Cloud Qdrant collection '{self.collection_name}'")
 
+    def recreate_collection(self):
+        """Delete and recreate the Qdrant collection."""
+        logger.warning(f"Recreating collection '{self.collection_name}' (dim={self.embedding_dimension})")
+        
+        # Local Qdrant
+        try:
+            self.qdrant.delete_collection(self.collection_name)
+        except Exception:
+            pass
+        
+        self.qdrant.create_collection(
+            collection_name=self.collection_name,
+            vectors_config=VectorParams(
+                size=self.embedding_dimension,
+                distance=Distance.COSINE,
+            ),
+        )
+        
+        # Cloud Qdrant
+        if self.qdrant_cloud:
+            try:
+                self.qdrant_cloud.delete_collection(self.collection_name)
+            except Exception:
+                pass
+            
+            self.qdrant_cloud.create_collection(
+                collection_name=self.collection_name,
+                vectors_config=VectorParams(
+                    size=self.embedding_dimension,
+                    distance=Distance.COSINE,
+                ),
+            )
+        logger.info("Collection recreation complete.")
+
     def generate_embedding(self, text: str) -> list[float]:
         """
         Generate an embedding vector for the given text.
@@ -257,7 +291,7 @@ class EmbeddingService:
             return all_embeddings
             
         elif self.embedding_provider == "huggingface" and self.hf_model:
-            logger.info(f"Embedding {len(texts)} texts with HuggingFace ({settings.embedding_model})")
+            logger.info(f"Embedding {len(texts)} texts with HuggingFace ({self.embedding_model})")
             embeddings = self.hf_model.encode(texts, batch_size=batch_size, show_progress_bar=False)
             return embeddings.tolist()
             
@@ -336,6 +370,33 @@ class EmbeddingService:
             )
 
         logger.info(f"Total chunks indexed: {len(chunks)}")
+
+    def index_from_jsonl(self, jsonl_path: Path, batch_size: int = 50):
+        """
+        Stream chunks from a JSONL file and index them in batches.
+        Prevents loading thousands of objects into memory.
+        """
+        self.ensure_collection()
+        
+        batch = []
+        total_indexed = 0
+        
+        with open(jsonl_path, "r", encoding="utf-8") as f:
+            for line in f:
+                data = json.loads(line)
+                batch.append(DocumentChunk(**data))
+                
+                if len(batch) >= batch_size:
+                    self.index_chunks(batch, batch_size=batch_size)
+                    total_indexed += len(batch)
+                    batch = []
+                    
+            # Final batch
+            if batch:
+                self.index_chunks(batch, batch_size=batch_size)
+                total_indexed += len(batch)
+                
+        logger.info(f"Streaming indexing complete. Total indexed: {total_indexed}")
 
     def search(
         self,
@@ -428,16 +489,8 @@ def index_all_processed_documents():
         logger.error("Run document processing first: python -m src.processing.document_processor")
         return
 
-    chunks = []
-    with open(chunks_file, "r", encoding="utf-8") as f:
-        for line in f:
-            data = json.loads(line)
-            chunks.append(DocumentChunk(**data))
-
-    logger.info(f"Loaded {len(chunks)} chunks from {chunks_file}")
-
-    # Index into Qdrant
-    service.index_chunks(chunks)
+    # Index into Qdrant using streaming
+    service.index_from_jsonl(chunks_file)
     logger.info("Indexing complete!")
 
     # Print collection info

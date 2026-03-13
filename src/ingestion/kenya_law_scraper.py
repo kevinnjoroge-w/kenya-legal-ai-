@@ -39,6 +39,7 @@ class CaseMetadata:
     url: str
     categories: list[str]
     source_file: Optional[str] = None
+    attachments: list[dict] = None  # To store {name, url, local_path}
 
 
 class KenyaLawScraper:
@@ -62,9 +63,12 @@ class KenyaLawScraper:
             follow_redirects=True,
             headers={
                 "User-Agent": (
-                    "KenyaLegalAI-Research/1.0 "
-                    "(Legal research tool; contact@example.com)"
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/115.0.0.0 Safari/537.36"
                 ),
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+                "Accept-Language": "en-US,en;q=0.9",
             },
         ) as client:
             response = await client.get(url)
@@ -149,6 +153,27 @@ class KenyaLawScraper:
             if akn_body:
                 judgment_text = akn_body.get_text(separator="\n", strip=True)
 
+        # Extract attachments (proceedings, transcripts, etc.)
+        attachments = []
+        # Look for links that point to files or have specific keywords
+        for link in soup.find_all("a", href=True):
+            href = link["href"]
+            text = link.get_text(strip=True).lower()
+            
+            # Common patterns for proceedings and extra documents
+            if any(k in text or k in href.lower() for k in ["proceeding", "transcript", "ruling", "submission", "motion"]):
+                attachments.append({
+                    "name": link.get_text(strip=True),
+                    "url": urljoin(BASE_URL, href)
+                })
+            # Also capture the generic "Download" or "Source" buttons if they exist
+            elif "/source" in href or href.endswith(".pdf"):
+                 if not any(a["url"] == urljoin(BASE_URL, href) for a in attachments):
+                    attachments.append({
+                        "name": link.get_text(strip=True) or "Attachment",
+                        "url": urljoin(BASE_URL, href)
+                    })
+
         metadata = CaseMetadata(
             case_number=metadata_dict.get("Case number", ""),
             title=title or metadata_dict.get("Title", "Unknown Case"),
@@ -159,6 +184,7 @@ class KenyaLawScraper:
             citation=metadata_dict.get("Citation", ""),
             url=url,
             categories=[],
+            attachments=attachments
         )
 
         return metadata, judgment_text
@@ -185,11 +211,31 @@ class KenyaLawScraper:
             text_path = case_dir / "judgment.txt"
             text_path.write_text(judgment_text, encoding="utf-8")
 
-            # Save metadata
+            # Save metadata (pre-attachment download to ensure record if download fails)
             meta_path = case_dir / "metadata.json"
             meta_path.write_text(
                 json.dumps(asdict(metadata), indent=2, ensure_ascii=False)
             )
+
+            # Download attachments
+            if metadata.attachments:
+                for idx, attachment in enumerate(metadata.attachments):
+                    ext = ".pdf" if "/source" in attachment["url"] or attachment["url"].endswith(".pdf") else ""
+                    # Ensure name is safe for file system
+                    safe_attach_name = re.sub(r"[^\w\-]", "_", attachment["name"])[:50]
+                    attach_path = case_dir / f"attachment_{idx}_{safe_attach_name}{ext}"
+                    
+                    logger.info(f"Downloading attachment: {attachment['name']}")
+                    try:
+                        if await self._download_pdf(attachment["url"], attach_path):
+                            attachment["local_path"] = str(attach_path)
+                    except Exception as e:
+                        logger.error(f"Failed to download attachment {attachment['url']}: {e}")
+
+                # Re-save metadata with local paths
+                meta_path.write_text(
+                    json.dumps(asdict(metadata), indent=2, ensure_ascii=False)
+                )
 
             metadata.source_file = str(text_path)
             logger.info(f"Scraped case: {metadata.title[:60]}...")
@@ -319,7 +365,7 @@ async def run_case_scraping(
 
     # Search for cases
     cases = await scraper.search_cases(
-        court=court, year=year, max_pages=max_pages
+        court=court, year=year
     )
 
     # Scrape each case

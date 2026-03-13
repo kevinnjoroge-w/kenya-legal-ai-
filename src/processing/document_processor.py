@@ -228,7 +228,7 @@ class LegalDocumentProcessor:
         return chunks
 
     def save_chunks(self, chunks: list[DocumentChunk], filename: str) -> Path:
-        """Save chunks to a JSONL file."""
+        """Save chunks to a JSONL file (overwrites existing)."""
         output_path = self.processed_dir / f"{filename}.jsonl"
         with open(output_path, "w", encoding="utf-8") as f:
             for chunk in chunks:
@@ -236,6 +236,11 @@ class LegalDocumentProcessor:
 
         logger.info(f"Saved {len(chunks)} chunks to {output_path}")
         return output_path
+
+    def append_chunk_to_file(self, chunk: DocumentChunk, output_path: Path):
+        """Append a single chunk to the JSONL file."""
+        with open(output_path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(asdict(chunk), ensure_ascii=False) + "\n")
 
     def process_judgment_file(
         self, text_path: Path, metadata_path: Path
@@ -381,75 +386,103 @@ class LegalDocumentProcessor:
         )
 
 
-def process_all_documents():
-    """Process all downloaded raw documents into chunks."""
+def process_all_documents(output_filename: str = "all_documents"):
+    """
+    Process all downloaded raw documents into chunks using a streaming approach
+     to keep memory usage low.
+    """
     settings = get_settings()
     processor = LegalDocumentProcessor()
-    all_chunks = []
+    output_path = Path(settings.processed_data_dir) / f"{output_filename}.jsonl"
+    
+    # Initialize/Clear the output file
+    with open(output_path, "w", encoding="utf-8") as f:
+        pass
+    
+    total_chunks = 0
+    total_docs = 0
 
-    # Process Kenya Law cases
-    cases_dir = Path(settings.raw_data_dir) / "kenya_law" / "cases"
-    if cases_dir.exists():
-        for case_dir in cases_dir.iterdir():
-            if case_dir.is_dir():
-                text_path = case_dir / "judgment.txt"
-                meta_path = case_dir / "metadata.json"
-                if text_path.exists() and meta_path.exists():
-                    chunks = processor.process_judgment_file(text_path, meta_path)
-                    all_chunks.extend(chunks)
-
-    # Process Laws.Africa legislation
+    # 1. Process Laws.Africa legislation (Primary Source for Statutes)
     laws_dir = Path(settings.raw_data_dir) / "laws_africa"
     if laws_dir.exists():
+        logger.info("Processing Laws.Africa documents...")
         for work_dir in laws_dir.iterdir():
             if work_dir.is_dir():
                 html_path = work_dir / "content.html"
                 meta_path = work_dir / "metadata.json"
                 if html_path.exists() and meta_path.exists():
                     chunks = processor.process_legislation_file(html_path, meta_path)
-                    all_chunks.extend(chunks)
+                    for c in chunks:
+                        processor.append_chunk_to_file(c, output_path)
+                    total_chunks += len(chunks)
+                    total_docs += 1
 
-    # Process Judiciary documents
+    # 2. Process Kenya Law cases
+    cases_dir = Path(settings.raw_data_dir) / "kenya_law" / "cases"
+    if cases_dir.exists():
+        logger.info("Processing Kenya Law cases...")
+        for case_dir in cases_dir.iterdir():
+            if case_dir.is_dir():
+                text_path = case_dir / "judgment.txt"
+                meta_path = case_dir / "metadata.json"
+                if text_path.exists() and meta_path.exists():
+                    chunks = processor.process_judgment_file(text_path, meta_path)
+                    for c in chunks:
+                        processor.append_chunk_to_file(c, output_path)
+                    total_chunks += len(chunks)
+                    total_docs += 1
+
+    # 3. Process Judiciary documents
     judiciary_dir = Path(settings.raw_data_dir) / "judiciary" / "documents"
     if judiciary_dir.exists():
+        logger.info("Processing Judiciary documents...")
         for doc_dir in judiciary_dir.iterdir():
             if doc_dir.is_dir():
                 chunks = processor.process_judiciary_file(doc_dir)
-                all_chunks.extend(chunks)
+                for c in chunks:
+                    processor.append_chunk_to_file(c, output_path)
+                total_chunks += len(chunks)
+                total_docs += 1
                 
-    # Process Kenya Law Gazettes
+    # 4. Process Kenya Law Gazettes
     gazettes_dir = Path(settings.raw_data_dir) / "kenya_law" / "gazettes"
     if gazettes_dir.exists():
+        logger.info("Processing Kenya Law Gazettes...")
         for doc_dir in gazettes_dir.iterdir():
             if doc_dir.is_dir():
-                # Gazettes are also PDFs usually
-                chunks = processor.process_judiciary_file(doc_dir) # Reuse the PDF processor
+                chunks = processor.process_judiciary_file(doc_dir)
                 for c in chunks:
                     c.source = "kenya_law"
                     c.document_type = "legal_notice"
-                all_chunks.extend(chunks)
+                    processor.append_chunk_to_file(c, output_path)
+                total_chunks += len(chunks)
+                total_docs += 1
 
-    # Process LSK documents
+    # 5. Process LSK documents
     lsk_dir = Path(settings.raw_data_dir) / "lsk"
     if lsk_dir.exists():
+        logger.info("Processing LSK documents...")
         for pdf_path in lsk_dir.glob("*.pdf"):
             chunks = processor.process_lsk_file(pdf_path)
-            all_chunks.extend(chunks)
+            for c in chunks:
+                processor.append_chunk_to_file(c, output_path)
+            total_chunks += len(chunks)
+            total_docs += 1
 
-    # Process CIPIT documents
+    # 6. Process CIPIT documents
     cipit_dir = Path(settings.raw_data_dir) / "cipit"
     if cipit_dir.exists():
+        logger.info("Processing CIPIT documents...")
         for filepath in cipit_dir.iterdir():
             if filepath.is_file() and filepath.suffix in [".pdf", ".html"]:
                 chunks = processor.process_cipit_file(filepath)
-                all_chunks.extend(chunks)
+                for c in chunks:
+                    processor.append_chunk_to_file(c, output_path)
+                total_chunks += len(chunks)
+                total_docs += 1
 
-    # Save all chunks
-    if all_chunks:
-        processor.save_chunks(all_chunks, "all_documents")
-
-    logger.info(f"Total chunks processed: {len(all_chunks)}")
-    return all_chunks
+    logger.info(f"Final Batch Processing Stats: {total_docs} documents, {total_chunks} total chunks.")
+    return total_chunks
 
 
 if __name__ == "__main__":

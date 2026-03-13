@@ -28,106 +28,84 @@ async def run_mass_ingestion():
     except Exception as e:
         logger.error(f"Constitution ingestion failed: {e}")
 
-    # 1. Judiciary Ingestion
-    logger.info("--- Starting Judiciary Ingestion ---")
-    j_scraper = JudiciaryScraper()
-    j_categories = ["hc-practice-directions", "cj-speeches", "speeches"]
-    for cat in j_categories:
-        docs = await j_scraper.scrape_category(cat)
-        # Process top 10 from each category
-        for doc in docs[:10]:
-            await j_scraper.process_document(doc)
-
-    # 1.5. EAC & International Treaties (Art 2(6) CoK)
-    logger.info("--- Starting EAC and Treaty Ingestion ---")
-    eac_ingestor = EACIngestor()
+    # 1. Laws.Africa Ingestion (All Primary Legislation)
+    logger.info("--- Starting Laws.Africa Full Statutory Ingestion ---")
     try:
-        await eac_ingestor.ingest_all()
-    except Exception as e:
-        logger.error(f"EAC ingestion failed: {e}")
-
-    # 2. Kenya Law (Bulk Scrape: Judgments & Gazettes)
-    logger.info("--- Starting Kenya Law Bulk Ingestion ---")
-    kl_scraper = KenyaLawScraper()
-    years = range(2024, 2027) # Focus on recent gazettes
-    
-    for year in years:
-        logger.info(f"Processing year {year} gazettes")
-        gazettes = await kl_scraper.scrape_gazettes(year=year)
-        for g in gazettes[:20]: # Top 20 gazettes per year
-            await kl_scraper.scrape_document_full(g)
-
-    # 2.5. Mass Judgment Ingestion (New Bulk Scraper)
-    from src.ingestion.bulk_judgment_scraper import BulkJudgmentScraper
-    logger.info("--- Starting Mass Judgment Ingestion ---")
-    bulk_scraper = BulkJudgmentScraper()
-    # Starting a full-scale ingestion run (500 pages per category)
-    # The checkpoint system allows this to be resumed in future runs.
-    await bulk_scraper.run_bulk_scrape(limit_pages=500)
-
-    # 2.6. Law Society of Kenya (LSK) Ingestion
-    logger.info("--- Starting LSK Ingestion ---")
-    lsk_scraper = LSKScraper()
-    try:
-        await lsk_scraper.ingest_all()
-    except Exception as e:
-        logger.error(f"LSK Ingestion failed: {e}")
-
-    # 2.7. CIPIT Data Protection Case Law Ingestion
-    logger.info("--- Starting CIPIT Ingestion ---")
-    cipit_scraper = CIPITScraper()
-    try:
-        await cipit_scraper.ingest_all()
-    except Exception as e:
-        logger.error(f"CIPIT Ingestion failed: {e}")
-
-    # 3. Laws.Africa Ingestion (bulk legislation)
-    logger.info("--- Starting Laws.Africa Bulk Ingestion ---")
-    # NOTE: la_client was already created above for the Constitution.
-    try:
-        # Fetch all metadata but only download top 50 works for context.
-        # The Constitution is skipped here because it was already ingested in step 0.
+        # Fetch all metadata
         works = await la_client.fetch_all_kenya_legislation()
-        skipped = 0
-        for work in works[:50]:
+        # Filter for primary legislation (Acts) to avoid downloading thousands of old Gazette PDFs initially
+        acts = [w for w in works if w.get("kind") == "act" or "constitution" in w.get("frbr_uri", "")]
+        
+        logger.info(f"Identified {len(acts)} Acts of Parliament to download.")
+        
+        count = 0
+        for work in acts:
             frbr_uri = work.get("frbr_uri", "")
-            if frbr_uri == LawsAfricaClient.CONSTITUTION_FRBR_URI:
-                skipped += 1
-                continue  # already downloaded in step 0
-            await la_client.download_work(frbr_uri)
-        logger.info(f"Bulk Laws.Africa ingestion done. Skipped {skipped} already-ingested work(s).")
+            if not frbr_uri:
+                continue
+                
+            # Check if already exists to save time/quota
+            safe_name = frbr_uri.strip("/").replace("/", "_")
+            if (la_client.raw_data_dir / safe_name / "content.html").exists():
+                continue
+
+            try:
+                await la_client.download_work(frbr_uri)
+                count += 1
+                if count % 10 == 0:
+                    logger.info(f"Downloaded {count}/{len(acts)} acts...")
+            except Exception as e:
+                logger.error(f"Failed to download {frbr_uri}: {e}")
+                
+        logger.info(f"Laws.Africa ingestion done. Downloaded {count} new works.")
     except Exception as e:
         logger.error(f"Laws.Africa ingestion failed: {e}")
 
-    # 4. Document Processing
-    logger.info("--- Processing All Documents ---")
+    # 2. Judiciary Ingestion (Practice Directions & Administrative Orders)
+    logger.info("--- Starting Judiciary Ingestion ---")
+    j_scraper = JudiciaryScraper()
+    j_categories = ["hc-practice-directions", "cj-speeches", "administrative-circulars"]
+    for cat in j_categories:
+        try:
+            docs = await j_scraper.scrape_category(cat)
+            for doc in docs[:10]: # Limit to top 10 most relevant
+                await j_scraper.process_document(doc)
+        except Exception as e:
+            logger.warning(f"Judiciary category {cat} failed: {e}")
+
+    # 3. LSK & CIPIT (Specialized cases)
+    logger.info("--- Starting Secondary Ingestions (LSK/CIPIT) ---")
+    for scraper_class in [LSKScraper, CIPITScraper]:
+        try:
+            s = scraper_class()
+            await s.ingest_all()
+        except Exception as e:
+            logger.warning(f"{scraper_class.__name__} failed: {e}")
+
+    # 4. KenyaLaw Bulk Scraping (with backoff & checkpoints)
+    logger.info("--- Starting KenyaLaw Bulk Scraping ---")
+    try:
+        from src.ingestion.bulk_judgment_scraper import BulkJudgmentScraper
+        bjs = BulkJudgmentScraper()
+        await bjs.run_bulk_scrape() # Run full scrape, checkpointing handles resumption
+        
+        from src.ingestion.legislation_scraper import LegislationScraper
+        ls = LegislationScraper()
+        await ls.run_bulk_ingestion(limit=10)
+        
+        from src.ingestion.bulk_gazette_scraper import BulkGazetteScraper
+        bgs = BulkGazetteScraper()
+        await bgs.run_bulk_scrape(start_year=2024, end_year=2023)
+    except Exception as e:
+        logger.warning(f"KenyaLaw bulk scraping encountered an issue: {e}")
+    # 4. Document Processing (Streaming to Disk)
+    logger.info("--- Processing All Documents (Streaming) ---")
     process_all_documents()
 
-    # 4. Indexing
-    logger.info("--- Indexing New Content ---")
-    processor = LegalDocumentProcessor()
-    # We load the all_documents.jsonl that was just created
-    from src.config.settings import get_settings
-    from src.processing.document_processor import DocumentChunk
-    import json
-    from pathlib import Path
-
-    settings = get_settings()
-    processed_file = Path(settings.processed_data_dir) / "all_documents.jsonl"
-    
-    if processed_file.exists():
-        chunks = []
-        with open(processed_file, "r", encoding="utf-8") as f:
-            for line in f:
-                data = json.loads(line)
-                chunks.append(DocumentChunk(**data))
-        
-        logger.info(f"Loaded {len(chunks)} chunks for indexing.")
-        embedding_service = EmbeddingService()
-        embedding_service.index_chunks(chunks)
-        logger.info("Indexing complete.")
-    else:
-        logger.warning("No processed documents found to index.")
+    # 5. Indexing (Streaming to Vector DB)
+    logger.info("--- Indexing New Content (Streaming to Qdrant) ---")
+    from src.embedding.embedding_service import index_all_processed_documents
+    index_all_processed_documents()
 
 if __name__ == "__main__":
     asyncio.run(run_mass_ingestion())

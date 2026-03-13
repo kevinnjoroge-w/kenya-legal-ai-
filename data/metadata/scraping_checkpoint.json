@@ -1,5 +1,5 @@
 {
-  "current_category_index": 6,
+  "current_category_index": 8,
   "current_page": 1,
   "completed_categories": [
     "supreme-court",
@@ -7,7 +7,10 @@
     "high-court",
     "employment-labour-relations-court",
     "environment-land-court",
-    "tribunals"
+    "tribunals",
+    "magistrates-courts",
+    "kadhis-court"
   ],
-  "total_scraped": 629
+  "total_scraped": 629,
+  "current_year": 2025
 }
