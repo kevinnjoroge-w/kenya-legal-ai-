@@ -71,14 +71,11 @@ function switchTab(tabName) {
         panel.classList.toggle('active', panel.id === `panel-${tabName}`);
     });
 
-    // Handle focus mode for chat
-    document.body.classList.toggle('chat-focus-mode', tabName === 'chat');
-
     // Close mobile nav
     const links = document.getElementById('navLinks');
     if (links) links.classList.remove('open');
 
-    // Hide hero when not on first load
+    // Hide hero after first message
     const hero = document.getElementById('hero');
     if (hero) {
         hero.style.display = tabName === 'chat' && state.chatHistory.length === 0 ? '' : 'none';
@@ -95,7 +92,6 @@ function scrollToChat() {
     const chatInput = document.getElementById('chatInput');
     if (chatInput) {
         chatInput.focus();
-        chatInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
 }
 
@@ -380,7 +376,14 @@ function addMessage(type, content, sources = [], followUpQuestions = [], groundi
     }
 
     messagesDiv.appendChild(messageEl);
-    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+
+    if (type === 'user') {
+        // For user messages: scroll to bottom so the AI loading reply is visible
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    } else {
+        // For AI replies: scroll to the TOP of this message so user reads from the start
+        messageEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
 
     return messageId;
 }
@@ -402,7 +405,8 @@ function addLoadingMessage() {
     `;
 
     messagesDiv.appendChild(messageEl);
-    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+    // Scroll the bounded messages container (not the page)
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
 
     return messageId;
 }

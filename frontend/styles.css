@@ -396,14 +396,12 @@ body.chat-focus-mode .navbar {
 
 body.chat-focus-mode .main-content {
     padding-top: 40px;
-    /* Less padding since navbar is gone */
 }
 
 .section-container {
     max-width: 1200px;
     margin: 0 auto;
-    padding: 40px 24px 140px;
-    /* Reduced for a tighter layout */
+    padding: 40px 24px 60px;
 }
 
 .section-header {
@@ -438,8 +436,10 @@ body.chat-focus-mode .main-content {
     background: transparent;
     border: none;
     border-radius: 0;
-    overflow: hidden;
+    overflow: visible;
     box-shadow: none;
+    display: flex;
+    flex-direction: column;
 }
 
 /* Chat Modes */
@@ -526,12 +526,15 @@ body.chat-focus-mode .main-content {
 
 /* Chat Messages */
 .chat-messages {
-    min-height: 500px;
-    max-height: none;
-    overflow-y: visible;
-    padding: 0;
+    min-height: 400px;
+    max-height: calc(100vh - var(--nav-height) - 160px);
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 0 0 24px;
     max-width: 800px;
     margin: 0 auto;
+    width: 100%;
+    scroll-behavior: smooth;
 }
 
 .chat-welcome {
@@ -728,22 +731,24 @@ body.chat-focus-mode .main-content {
     animation-delay: 0.4s;
 }
 
-/* Chat Input */
+/* Chat Input — sticky to bottom of chat panel, never covers footer */
 .chat-input-area {
-    position: fixed;
+    position: sticky;
     bottom: 0;
     left: 0;
     right: 0;
-    padding: 24px 20px 40px;
-    background: linear-gradient(to top, var(--bg-primary) 60%, transparent);
-    z-index: 100;
+    padding: 16px 20px 24px;
+    background: linear-gradient(to top, var(--bg-primary) 70%, transparent);
+    z-index: 10;
+    max-width: 800px;
+    margin: 0 auto;
+    width: 100%;
 }
 
 @media (max-width: 768px) {
     .chat-input-area {
-        padding: 12px 12px 24px;
+        padding: 10px 12px 16px;
         background: var(--bg-primary);
-        /* More solid background for mobile keyboards */
     }
 }
 
@@ -1465,12 +1470,12 @@ body.chat-focus-mode .footer {
     }
 
     .section-container {
-        padding-bottom: 110px;
-        /* Further reduced for mobile */
+        padding-bottom: 32px;
     }
 
     .chat-messages {
-        padding: 0 12px;
+        padding: 0 12px 16px;
+        max-height: calc(100vh - var(--nav-height) - 140px);
     }
 
     .message-user .message-content {
