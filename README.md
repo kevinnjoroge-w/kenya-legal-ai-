@@ -257,5 +257,4 @@ Kenya Legal AI is a **legal research tool** and does **not constitute legal advi
 
 ## License
 
-MIT
 # kenya-legal-ai-
