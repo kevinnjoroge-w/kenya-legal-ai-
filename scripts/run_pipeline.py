@@ -69,8 +69,8 @@ def step_process():
     logger.info("STEP 2: DOCUMENT PROCESSING")
     logger.info("=" * 60)
 
-    chunks = process_all_documents()
-    logger.info(f"Processing complete. Total chunks: {len(chunks)}")
+    total_chunks = process_all_documents()
+    logger.info(f"Processing complete. Total chunks: {total_chunks}")
 
 
 def step_index():

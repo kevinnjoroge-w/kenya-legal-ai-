@@ -44,7 +44,7 @@ COUNTIES = [
     {"name": "West Pokot County", "slug": "west_pokot"},
 ]
 
-DOC_TYPES = ["acts", "bills", "legal_notices"]
+DOC_TYPES = ["acts", "legal_notices"]
 COUNTY_YEARS = list(range(2021, 2012, -1))  # 2013–2021
 
 

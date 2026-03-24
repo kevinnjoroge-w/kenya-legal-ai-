@@ -339,6 +339,45 @@ class LegalDocumentProcessor:
             metadata=metadata,
         )
 
+    def process_generic_kenyalaw_dir(
+        self, doc_dir: Path, doc_type: str, pdf_names: tuple = ("document.pdf", "bill.pdf", "decision.pdf", "hansard.pdf", "content.pdf")
+    ) -> list[DocumentChunk]:
+        """Process a generic KenyaLaw document directory (PDF/Text + metadata) into chunks."""
+        meta_path = doc_dir / "metadata.json"
+        if not meta_path.exists():
+            return []
+            
+        try:
+            metadata = json.loads(meta_path.read_text(encoding="utf-8"))
+        except Exception:
+            return []
+        
+        text_path = doc_dir / "content.txt"
+        if text_path.exists():
+            text = text_path.read_text(encoding="utf-8")
+        else:
+            text = ""
+            for pdf_name in pdf_names:
+                pdf_path = doc_dir / pdf_name
+                if pdf_path.exists():
+                    text = self.extract_text_from_pdf(pdf_path)
+                    break
+                    
+        if not text:
+            return []
+            
+        doc_id = self._generate_document_id("kenya_law", doc_dir.name)
+        title = metadata.get("title", doc_dir.name.replace("_", " "))
+        
+        return self.chunk_document(
+            text=text,
+            document_id=doc_id,
+            document_title=title,
+            document_type=doc_type,
+            source="kenya_law",
+            metadata=metadata,
+        )
+
     def process_lsk_file(self, pdf_path: Path) -> list[DocumentChunk]:
         """Process an LSK document (PDF only, no metadata) into chunks."""
         if not pdf_path.exists():
@@ -455,6 +494,74 @@ def process_all_documents(output_filename: str = "all_documents"):
                     c.source = "kenya_law"
                     c.document_type = "legal_notice"
                     processor.append_chunk_to_file(c, output_path)
+                if chunks:
+                    total_chunks += len(chunks)
+                    total_docs += 1
+
+    # 4.1 Process Kenya Law Bills
+    bills_dir = Path(settings.raw_data_dir) / "kenya_law" / "bills"
+    if bills_dir.exists():
+        logger.info("Processing Parliamentary Bills...")
+        for meta_path in bills_dir.rglob("metadata.json"):
+            chunks = processor.process_generic_kenyalaw_dir(meta_path.parent, "bill")
+            for c in chunks:
+                processor.append_chunk_to_file(c, output_path)
+            if chunks:
+                total_chunks += len(chunks)
+                total_docs += 1
+
+    # 4.2 Process Kenya Law Tribunals
+    tribunals_dir = Path(settings.raw_data_dir) / "kenya_law" / "tribunals"
+    if tribunals_dir.exists():
+        logger.info("Processing Tribunal Decisions...")
+        for meta_path in tribunals_dir.rglob("metadata.json"):
+            chunks = processor.process_generic_kenyalaw_dir(meta_path.parent, "judgment")
+            for c in chunks:
+                processor.append_chunk_to_file(c, output_path)
+            if chunks:
+                total_chunks += len(chunks)
+                total_docs += 1
+
+    # 4.3 Process Practice Notes
+    practice_notes_dir = Path(settings.raw_data_dir) / "kenya_law" / "practice_notes"
+    if practice_notes_dir.exists():
+        logger.info("Processing Practice Notes...")
+        for meta_path in practice_notes_dir.rglob("metadata.json"):
+            chunks = processor.process_generic_kenyalaw_dir(meta_path.parent, "legal_notice")
+            for c in chunks:
+                processor.append_chunk_to_file(c, output_path)
+            if chunks:
+                total_chunks += len(chunks)
+                total_docs += 1
+
+    # 4.4 Process Hansard Debates
+    hansard_dir = Path(settings.raw_data_dir) / "kenya_law" / "hansard"
+    if hansard_dir.exists():
+        logger.info("Processing Hansard Debates...")
+        for meta_path in hansard_dir.rglob("metadata.json"):
+            chunks = processor.process_generic_kenyalaw_dir(meta_path.parent, "hansard")
+            for c in chunks:
+                processor.append_chunk_to_file(c, output_path)
+            if chunks:
+                total_chunks += len(chunks)
+                total_docs += 1
+
+    # 4.5 Process County Legislation
+    county_dir = Path(settings.raw_data_dir) / "kenya_law" / "county"
+    if county_dir.exists():
+        logger.info("Processing County Legislation...")
+        for meta_path in county_dir.rglob("metadata.json"):
+            try:
+                meta = json.loads(meta_path.read_text(encoding="utf-8"))
+                doc_type_raw = meta.get("doc_type", "act")
+                doc_type = "act" if doc_type_raw == "acts" else ("bill" if doc_type_raw == "bills" else "legal_notice")
+            except Exception:
+                doc_type = "act"
+                
+            chunks = processor.process_generic_kenyalaw_dir(meta_path.parent, doc_type)
+            for c in chunks:
+                processor.append_chunk_to_file(c, output_path)
+            if chunks:
                 total_chunks += len(chunks)
                 total_docs += 1
 
