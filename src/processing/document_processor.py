@@ -11,7 +11,128 @@ import logging
 import re
 import hashlib
 from dataclasses import dataclass, asdict, field
-from pathlib import Path
+from pathlib import Pathvenv) ┌─[✗]─[defk@parrot]─[~/kenya-legal-ai-]
+└──╼ $python -m scripts.run_pipeline --step index
+
+╔═══════════════════════════════════════════════════════╗
+║           Kenya Legal AI — Data Pipeline              ║
+║         Constitution • Acts • Judgments • More         ║
+╚═══════════════════════════════════════════════════════╝
+
+2026-03-26 14:21:07,398 | __main__ | INFO | ============================================================
+2026-03-26 14:21:07,398 | __main__ | INFO | STEP 3: EMBEDDING & INDEXING
+2026-03-26 14:21:07,399 | __main__ | INFO | ============================================================
+Traceback (most recent call last):
+File "/home/defk/kenya-legal-ai-/venv/lib/python3.13/site-packages/httpx/_transports/default.py", line 72, in map_httpcore_exceptions
+yield
+File "/home/defk/kenya-legal-ai-/venv/lib/python3.13/site-packages/httpx/_transports/default.py", line 236, in handle_request
+resp = self._pool.handle_request(req)
+File "/home/defk/kenya-legal-ai-/venv/lib/python3.13/site-packages/httpcore/_sync/connection_pool.py", line 256, in handle_request
+raise exc from None
+File "/home/defk/kenya-legal-ai-/venv/lib/python3.13/site-packages/httpcore/_sync/connection_pool.py", line 236, in handle_request
+response = connection.handle_request(
+pool_request.request
+)
+File "/home/defk/kenya-legal-ai-/venv/lib/python3.13/site-packages/httpcore/_sync/connection.py", line 101, in handle_request
+raise exc
+File "/home/defk/kenya-legal-ai-/venv/lib/python3.13/site-packages/httpcore/_sync/connection.py", line 78, in handle_request
+stream = self._connect(request)
+File "/home/defk/kenya-legal-ai-/venv/lib/python3.13/site-packages/httpcore/_sync/connection.py", line 124, in _connect
+stream = self._network_backend.connect_tcp(**kwargs)
+File "/home/defk/kenya-legal-ai-/venv/lib/python3.13/site-packages/httpcore/_backends/sync.py", line 207, in connect_tcp
+with map_exceptions(exc_map):
+~~~~~~~~~~~~~~^^^^^^^^^
+File "/usr/lib/python3.13/contextlib.py", line 162, in __exit__
+self.gen.throw(value)
+~~~~~~~~~~~~~~^^^^^^^
+File "/home/defk/kenya-legal-ai-/venv/lib/python3.13/site-packages/httpcore/_exceptions.py", line 14, in map_exceptions
+raise to_exc(exc) from exc
+httpcore.ConnectError: [Errno -3] Temporary failure in name resolution
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+File "/home/defk/kenya-legal-ai-/venv/lib/python3.13/site-packages/qdrant_client/http/api_client.py", line 106, in send_inner
+response = self._client.send(request)
+File "/home/defk/kenya-legal-ai-/venv/lib/python3.13/site-packages/httpx/_client.py", line 926, in send
+response = self._send_handling_auth(
+request,
+...<2 lines>...
+history=[],
+)
+File "/home/defk/kenya-legal-ai-/venv/lib/python3.13/site-packages/httpx/_client.py", line 954, in _send_handling_auth
+response = self._send_handling_redirects(
+request,
+follow_redirects=follow_redirects,
+history=history,
+)
+File "/home/defk/kenya-legal-ai-/venv/lib/python3.13/site-packages/httpx/_client.py", line 991, in _send_handling_redirects
+response = self._send_single_request(request)
+File "/home/defk/kenya-legal-ai-/venv/lib/python3.13/site-packages/httpx/_client.py", line 1027, in _send_single_request
+response = transport.handle_request(request)
+File "/home/defk/kenya-legal-ai-/venv/lib/python3.13/site-packages/httpx/_transports/default.py", line 235, in handle_request
+with map_httpcore_exceptions():
+~~~~~~~~~~~~~~~~~~~~~~~^^
+File "/usr/lib/python3.13/contextlib.py", line 162, in __exit__
+self.gen.throw(value)
+~~~~~~~~~~~~~~^^^^^^^
+File "/home/defk/kenya-legal-ai-/venv/lib/python3.13/site-packages/httpx/_transports/default.py", line 89, in map_httpcore_exceptions
+raise mapped_exc(message) from exc
+httpx.ConnectError: [Errno -3] Temporary failure in name resolution
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+File "<frozen runpy>", line 198, in _run_module_as_main
+File "<frozen runpy>", line 88, in _run_code
+File "/home/defk/kenya-legal-ai-/scripts/run_pipeline.py", line 120, in <module>
+main()
+~~~~^^
+File "/home/defk/kenya-legal-ai-/scripts/run_pipeline.py", line 114, in main
+step_index()
+~~~~~~~~~~^^
+File "/home/defk/kenya-legal-ai-/scripts/run_pipeline.py", line 82, in step_index
+index_all_processed_documents()
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+File "/home/defk/kenya-legal-ai-/src/embedding/embedding_service.py", line 499, in index_all_processed_documents
+service.index_from_jsonl(chunks_file)
+~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+File "/home/defk/kenya-legal-ai-/src/embedding/embedding_service.py", line 385, in index_from_jsonl
+self.ensure_collection()
+~~~~~~~~~~~~~~~~~~~~~~^^
+File "/home/defk/kenya-legal-ai-/src/embedding/embedding_service.py", line 117, in ensure_collection
+collections = self.qdrant.get_collections().collections
+~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+File "/home/defk/kenya-legal-ai-/venv/lib/python3.13/site-packages/qdrant_client/qdrant_client.py", line 2076, in get_collections
+return self._client.get_collections(**kwargs)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+File "/home/defk/kenya-legal-ai-/venv/lib/python3.13/site-packages/qdrant_client/qdrant_remote.py", line 2597, in get_collections
+self.http.collections_api.get_collections().result
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+File "/home/defk/kenya-legal-ai-/venv/lib/python3.13/site-packages/qdrant_client/http/api/collections_api.py", line 1335, in get_collections
+return self._build_for_get_collections()
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+File "/home/defk/kenya-legal-ai-/venv/lib/python3.13/site-packages/qdrant_client/http/api/collections_api.py", line 432, in _build_for_get_collections
+return self.api_client.request(
+~~~~~~~~~~~~~~~~~~~~~~~^
+type_=m.InlineResponse2004,
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...<2 lines>...
+headers=headers if headers else None,
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+)
+^
+File "/home/defk/kenya-legal-ai-/venv/lib/python3.13/site-packages/qdrant_client/http/api_client.py", line 79, in request
+return self.send(request, type_)
+~~~~~~~~~^^^^^^^^^^^^^^^^
+File "/home/defk/kenya-legal-ai-/venv/lib/python3.13/site-packages/qdrant_client/http/api_client.py", line 96, in send
+response = self.middleware(request, self.send_inner)
+File "/home/defk/kenya-legal-ai-/venv/lib/python3.13/site-packages/qdrant_client/http/api_client.py", line 205, in __call__
+return call_next(request)
+File "/home/defk/kenya-legal-ai-/venv/lib/python3.13/site-packages/qdrant_client/http/api_client.py", line 108, in send_inner
+raise ResponseHandlingException(e)
+qdrant_client.http.exceptions.ResponseHandlingException: [Errno -3] Temporary failure in name resolution
+(venv) ┌─[✗]─[defk@parrot]─[~/kenya-legal-ai-]
 from typing import Optional, List
 import fitz # PyMuPDF
 

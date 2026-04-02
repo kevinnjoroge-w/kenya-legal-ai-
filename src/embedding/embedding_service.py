@@ -13,6 +13,15 @@ from pathlib import Path
 from typing import Optional
 import os
 
+import httpx
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    wait_exponential,
+    retry_if_exception_type,
+    before_sleep_log,
+)
+
 try:
     from sentence_transformers import SentenceTransformer
 except ImportError:
@@ -90,26 +99,38 @@ class EmbeddingService:
             self.qdrant = QdrantClient(
                 url=url,
                 api_key=settings.qdrant_api_key,
+                timeout=120.0,
             )
         else:
             self.qdrant = QdrantClient(
                 host=settings.qdrant_host,
                 port=settings.qdrant_port,
-                timeout=60.0,
+                timeout=120.0,
             )
 
         self.collection_name = settings.qdrant_collection
+        self._collection_ensured = False
         
         self.qdrant_cloud = None
         if hasattr(settings, "qdrant_cloud_host") and settings.qdrant_cloud_host and hasattr(settings, "qdrant_cloud_api_key") and settings.qdrant_cloud_api_key:
             self.qdrant_cloud = QdrantClient(
                 url=settings.qdrant_cloud_host,
                 api_key=settings.qdrant_cloud_api_key,
-                timeout=60.0,
+                timeout=120.0,
             )
 
+    @retry(
+        retry=retry_if_exception_type((httpx.ConnectError, httpx.ConnectTimeout, httpx.PoolTimeout, Exception)),
+        stop=stop_after_attempt(10),
+        wait=wait_exponential(multiplier=1, min=2, max=60),
+        before_sleep=before_sleep_log(logger, logging.WARNING),
+        reraise=True
+    )
     def ensure_collection(self):
         """Create the Qdrant collection if it doesn't exist."""
+        if self._collection_ensured:
+            return
+
         collections = self.qdrant.get_collections().collections
         exists = any(c.name == self.collection_name for c in collections)
 
@@ -141,6 +162,8 @@ class EmbeddingService:
                     ),
                 )
                 logger.info(f"Created Cloud Qdrant collection '{self.collection_name}'")
+
+        self._collection_ensured = True
 
     def recreate_collection(self):
         """Delete and recreate the Qdrant collection."""
@@ -176,6 +199,13 @@ class EmbeddingService:
             )
         logger.info("Collection recreation complete.")
 
+    @retry(
+        retry=retry_if_exception_type((httpx.ConnectError, httpx.ConnectTimeout, httpx.PoolTimeout, Exception)),
+        stop=stop_after_attempt(10),
+        wait=wait_exponential(multiplier=1, min=2, max=60),
+        before_sleep=before_sleep_log(logger, logging.WARNING),
+        reraise=True
+    )
     def generate_embedding(self, text: str) -> list[float]:
         """
         Generate an embedding vector for the given text.
@@ -200,17 +230,30 @@ class EmbeddingService:
             )
             return result["embedding"]
         elif self.embedding_provider == "cohere":
-            response = self.cohere_client.embed(
-                texts=[text],
-                model=self.embedding_model,
-                input_type="search_document",
-                embedding_types=["float"]
-            )
-            return response.embeddings.float_[0]
+            try:
+                response = self.cohere_client.embed(
+                    texts=[text],
+                    model=self.embedding_model,
+                    input_type="search_document",
+                    embedding_types=["float"]
+                )
+                return response.embeddings.float_[0]
+            except Exception as e:
+                if "429" in str(e):
+                    logger.error("Cohere API rate limit exceeded (429).")
+                    logger.error("Suggestion: Switch EMBEDDING_PROVIDER to 'huggingface' in .env for local embeddings.")
+                raise e
         elif self.embedding_provider == "huggingface" and self.hf_model:
             return self.hf_model.encode(text).tolist()
         return []
 
+    @retry(
+        retry=retry_if_exception_type((httpx.ConnectError, httpx.ConnectTimeout, httpx.PoolTimeout, Exception)),
+        stop=stop_after_attempt(10),
+        wait=wait_exponential(multiplier=1, min=2, max=60),
+        before_sleep=before_sleep_log(logger, logging.WARNING),
+        reraise=True
+    )
     def generate_embeddings_batch(
         self, texts: list[str], batch_size: int = 100
     ) -> list[list[float]]:
@@ -282,6 +325,10 @@ class EmbeddingService:
                         time.sleep(1) # Small delay to respect 10k/min ratelimits
                         break
                     except Exception as e:
+                        if "429" in str(e):
+                            logger.error("Cohere API rate limit exceeded (429) during batch processing.")
+                            logger.error("Suggestion: Switch EMBEDDING_PROVIDER to 'huggingface' in .env for local embeddings.")
+                        
                         if attempt < max_retries - 1:
                             wait_time = 5 * (attempt + 1)
                             logger.warning(f"Cohere API error, waiting {wait_time}s... ({e})")
@@ -340,24 +387,44 @@ class EmbeddingService:
                     )
                 )
 
-            # Upsert to Qdrant
-            try:
+            # Upsert with retry
+            @retry(
+                retry=retry_if_exception_type((httpx.ConnectError, httpx.ConnectTimeout, httpx.PoolTimeout, Exception)),
+                stop=stop_after_attempt(10),
+                wait=wait_exponential(multiplier=1, min=2, max=60),
+                before_sleep=before_sleep_log(logger, logging.WARNING),
+                reraise=True
+            )
+            def _upsert_local():
                 self.qdrant.upsert(
                     collection_name=self.collection_name,
                     points=points,
                 )
+
+            try:
+                _upsert_local()
             except Exception as e:
-                logger.error(f"Failed to upsert to local Qdrant: {e}")
+                logger.error(f"Failed to upsert to local Qdrant after retries: {e}")
             
             # Upsert to Cloud Qdrant
             if self.qdrant_cloud:
-                try:
+                @retry(
+                    retry=retry_if_exception_type((httpx.ConnectError, httpx.ConnectTimeout, httpx.PoolTimeout, Exception)),
+                    stop=stop_after_attempt(10),
+                    wait=wait_exponential(multiplier=1, min=2, max=60),
+                    before_sleep=before_sleep_log(logger, logging.WARNING),
+                    reraise=True
+                )
+                def _upsert_cloud():
                     self.qdrant_cloud.upsert(
                         collection_name=self.collection_name,
                         points=points,
                     )
+
+                try:
+                    _upsert_cloud()
                 except Exception as e:
-                    logger.error(f"Failed to upsert to Cloud Qdrant: {e}")
+                    logger.error(f"Failed to upsert to Cloud Qdrant after retries: {e}")
             
             # Small delay between batches to respect rate limits
             if self.embedding_provider == "google":
@@ -440,12 +507,21 @@ class EmbeddingService:
         search_filter = Filter(must=conditions) if conditions else None
 
         # Search Qdrant
-        results = self.qdrant.search(
-            collection_name=self.collection_name,
-            query_vector=query_embedding,
-            limit=top_k,
-            query_filter=search_filter,
+        @retry(
+            retry=retry_if_exception_type((httpx.ConnectError, Exception)),
+            stop=stop_after_attempt(3),
+            wait=wait_exponential(multiplier=1, min=2, max=10),
+            reraise=True
         )
+        def _execute_search():
+            return self.qdrant.search(
+                collection_name=self.collection_name,
+                query_vector=query_embedding,
+                limit=top_k,
+                query_filter=search_filter,
+            )
+        
+        results = _execute_search()
 
         return [
             {
