@@ -56,6 +56,77 @@ function initNavigation() {
                 : 'rgba(10, 14, 23, 0.85)';
         }
     });
+
+    // Responsive viewport handling
+    initResponsiveFeatures();
+}
+
+function initResponsiveFeatures() {
+    // Handle viewport height changes (keyboard, orientation)
+    let viewportHeight = window.innerHeight;
+    const updateViewportHeight = () => {
+        const currentHeight = window.innerHeight;
+        if (Math.abs(currentHeight - viewportHeight) > 150) { // Significant change
+            viewportHeight = currentHeight;
+            updateChatHeight();
+        }
+    };
+
+    window.addEventListener('resize', updateViewportHeight);
+    window.addEventListener('orientationchange', () => {
+        setTimeout(updateViewportHeight, 100); // Wait for orientation to complete
+    });
+
+    // Touch device optimizations
+    if ('ontouchstart' in window) {
+        // Prevent zoom on double-tap
+        let lastTouchEnd = 0;
+        document.addEventListener('touchend', (e) => {
+            const now = Date.now();
+            if (now - lastTouchEnd <= 300) {
+                e.preventDefault();
+            }
+            lastTouchEnd = now;
+        }, false);
+
+        // Improve scrolling on iOS
+        document.addEventListener('touchmove', (e) => {
+            if (e.target.closest('.chat-messages')) {
+                // Allow natural scrolling in chat
+                return;
+            }
+        }, { passive: true });
+    }
+
+    // Handle focus events for better mobile keyboard experience
+    const chatInput = document.getElementById('chatInput');
+    if (chatInput) {
+        chatInput.addEventListener('focus', () => {
+            setTimeout(() => {
+                updateChatHeight();
+                // Scroll to input on mobile
+                if (window.innerWidth <= 768) {
+                    chatInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }, 300);
+        });
+
+        chatInput.addEventListener('blur', () => {
+            setTimeout(updateChatHeight, 300);
+        });
+    }
+}
+
+function updateChatHeight() {
+    const chatMessages = document.getElementById('chatMessages');
+    if (chatMessages) {
+        const navbarHeight = 72; // var(--nav-height)
+        const inputAreaHeight = 80; // Approximate input area height
+        const padding = window.innerWidth <= 480 ? 140 : 200; // Responsive padding
+
+        const availableHeight = window.innerHeight - navbarHeight - inputAreaHeight - padding;
+        chatMessages.style.maxHeight = Math.max(availableHeight, 200) + 'px';
+    }
 }
 
 function switchTab(tabName) {
@@ -131,6 +202,9 @@ function initChat() {
             showNavMenu(navMenuBtn);
         });
     }
+
+    // Initialize chat height
+    updateChatHeight();
 }
 
 function showNavMenu(anchor) {
