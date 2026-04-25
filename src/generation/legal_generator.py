@@ -153,6 +153,9 @@ QUERY_TEMPLATE = """\
 - Open with the actual legal position, not a throat-clearing introduction paragraph.
 - Trace the full precedent chain visible in the sources or your knowledge.
 
+## Follow-up Questions:
+After your main answer, suggest 2-3 specific follow-up questions that would help deepen the research or clarify practical application. Format as a bullet list.
+
 ## Answer:"""
 
 DIRECT_QUERY_TEMPLATE = """\
@@ -171,6 +174,9 @@ DIRECT_QUERY_TEMPLATE = """\
 - If you are uncertain about a specific detail (e.g. a case number), say so \
   explicitly — do not guess.
 - End with a plain-English summary of the most critical point.
+
+## Follow-up Questions:
+After your main answer, suggest 2-3 specific follow-up questions that would help deepen the research or clarify practical application. Format as a bullet list.
 
 ## Answer:"""
 
@@ -894,17 +900,53 @@ class LegalGenerator:
         history, temperature, max_tokens
     ) -> dict:
         """Generate a response grounded in retrieved source documents."""
-        # Retrieve relevant context
-        context = self.retrieval.retrieve_for_context(
+        # Retrieve relevant context and sources in one call
+        raw_results = self.retrieval.retrieve(
             query=query,
             document_type=document_type,
             court=court,
         )
 
-        if not context:
+        if not raw_results:
             # No relevant documents found — fall back to direct mode
             logger.info("No RAG context found — falling back to direct mode")
             return self._generate_direct(query, mode, history, temperature, max_tokens)
+
+        # Build context from results
+        context_parts = []
+        total_length = 0
+        max_context_length = 12000
+
+        for i, result in enumerate(raw_results, 1):
+            source_info = []
+            if result.get("document_title"):
+                source_info.append(result["document_title"])
+            if result.get("section"):
+                source_info.append(result["section"])
+            if result.get("citation"):
+                source_info.append(result["citation"])
+            if result.get("court"):
+                source_info.append(result["court"])
+            if result.get("date"):
+                source_info.append(result["date"])
+
+            authority = result.get("hierarchy_weight", 0)
+            authority_label = self.retrieval._authority_label(authority)
+
+            source_label = " | ".join(source_info) if source_info else "Unknown Source"
+
+            chunk = (
+                f"[Source {i}: {source_label} | Authority: {authority_label}]\n"
+                f"{result['text']}\n"
+            )
+
+            if total_length + len(chunk) > max_context_length:
+                break
+
+            context_parts.append(chunk)
+            total_length += len(chunk)
+
+        context = "\n---\n".join(context_parts)
 
         template = self._RAG_TEMPLATES.get(mode, QUERY_TEMPLATE)
         user_prompt = template.format(context=context, query=query)
@@ -921,10 +963,10 @@ class LegalGenerator:
 
             response_text = completion.choices[0].message.content
 
+            # Parse follow-up questions from response
+            main_response, follow_up_questions = self._parse_follow_ups(response_text)
+
             # Extract source metadata for the frontend
-            raw_results = self.retrieval.retrieve(
-                query=query, document_type=document_type, court=court,
-            )
             sources = [
                 {
                     "title": r.get("document_title", ""),
@@ -937,10 +979,8 @@ class LegalGenerator:
                 for r in raw_results
             ]
 
-            follow_up_questions = self._generate_follow_up_questions(query)
-
             return {
-                "response": response_text,
+                "response": main_response,
                 "sources": sources,
                 "mode": mode,
                 "model": self.model,
@@ -974,10 +1014,12 @@ class LegalGenerator:
             )
 
             response_text = completion.choices[0].message.content
-            follow_up_questions = self._generate_follow_up_questions(query)
+
+            # Parse follow-up questions from response
+            main_response, follow_up_questions = self._parse_follow_ups(response_text)
 
             return {
-                "response": response_text,
+                "response": main_response,
                 "sources": [],
                 "mode": mode,
                 "model": self.model,
@@ -1021,6 +1063,27 @@ class LegalGenerator:
             }
 
     # ── Internal: Helpers ──────────────────────────────────────────────────────
+
+    def _parse_follow_ups(self, response_text: str) -> tuple[str, list[str]]:
+        """
+        Parse the main response and follow-up questions from the LLM output.
+        
+        Looks for a 'Follow-up Questions:' section and splits accordingly.
+        """
+        if "## Follow-up Questions:" in response_text:
+            parts = response_text.split("## Follow-up Questions:", 1)
+            main_response = parts[0].strip()
+            followup_section = parts[1].strip()
+            # Parse bullet points
+            questions = [
+                q.strip().lstrip("-•* ")
+                for q in followup_section.splitlines()
+                if q.strip() and q.strip().startswith(("-", "•", "*", "1.", "2.", "3."))
+            ]
+            return main_response, questions[:3]
+        else:
+            # Fallback: no follow-ups found
+            return response_text.strip(), []
 
     def _build_messages(
         self,

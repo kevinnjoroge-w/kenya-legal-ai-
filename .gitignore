@@ -35,3 +35,4 @@ logs/
 
 # Qdrant local data
 qdrant_storage/
+.env

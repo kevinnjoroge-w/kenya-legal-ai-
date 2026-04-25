@@ -21,11 +21,17 @@ An AI-powered legal research assistant built on Kenya's Constitution of 2010, Ac
 
 ## Data Sources
 
-| Source | What We Ingest |
-|---|---|
-| **Kenya Law** ([kenyalaw.org](https://new.kenyalaw.org)) | Court judgments (all levels), Kenya Gazette notices (2020–2026) |
-| **Laws.Africa API** ([laws.africa](https://api.laws.africa/v3)) | Constitution of Kenya 2010 (priority), Acts of Parliament (Akoma Ntoso XML + HTML) |
-| **Judiciary of Kenya** ([judiciary.go.ke](https://judiciary.go.ke)) | Practice directions, CJ speeches, administrative circulars |
+| Source | What We Ingest | API/Scraping |
+|---|---|---|
+| **Kenya Law** ([kenyalaw.org](https://new.kenyalaw.org)) | Court judgments (all levels), Kenya Gazette notices (2020–2026) | Web scraping |
+| **Laws.Africa API** ([laws.africa](https://api.laws.africa/v3)) | Constitution of Kenya 2010 (priority), Acts of Parliament (Akoma Ntoso XML + HTML) | REST API |
+| **Judiciary of Kenya** ([judiciary.go.ke](https://judiciary.go.ke)) | Practice directions, CJ speeches, administrative circulars | Web scraping |
+| **AfricanLII** ([africanlii.org](https://africanlii.org/)) | Kenya case law, judgments, legislation (supplementary) | REST API |
+| **Kenya Law Reports** ([kenyalawreports.or.ke](https://kenyalawreports.or.ke)) | Official law reports, EARLR, KLR, historical judgments | Web scraping |
+| **KRA Tax Laws** ([kra.go.ke](https://kra.go.ke)) | Tax Acts (Income Tax, VAT, Excise), regulations, circulars | Web scraping |
+| **Parliament** ([parliament.go.ke](https://parliament.go.ke)) | Bills, Order Papers, Votes & Proceedings, Committee Reports, Hansard, Standing Orders | Web scraping |
+| **Law Society of Kenya** ([lsk.or.ke](https://lsk.or.ke)) | Public resources, guidelines, practice directions | Web scraping |
+| **EAC** ([eac.int](https://eac.int)) | Regional treaties, protocols, East African legislation | Web scraping |
 
 The **Constitution of Kenya 2010** is ingested first as a dedicated priority step — it is always in the knowledge base before any other source is processed.
 
@@ -34,12 +40,20 @@ The **Constitution of Kenya 2010** is ingested first as a dedicated priority ste
 ## Architecture
 
 ```
-Data Sources
-  └── Kenya Law · Laws.Africa API · Judiciary Website
+Data Sources (19 sources)
+  ├── Kenya Law (judgments, gazettes)
+  ├── Laws.Africa API (Constitution, Acts)
+  ├── Judiciary Kenya (directives, circulars)
+  ├── AfricanLII (supplementary cases)
+  ├── Kenya Law Reports (official reports)
+  ├── KRA (tax laws, regulations)
+  ├── Parliament (hansard, bills, orders, votes)
+  ├── Law Society Kenya (public resources)
+  └── EAC (regional legislation)
         │
         ▼
   Ingestion Layer (src/ingestion/)
-  └── KenyaLawScraper · LawsAfricaClient · JudiciaryScraper · MassIngest orchestrator
+  └── 20 specialized scrapers + 4 new scrapers (AfricanLII, KLR, KRA, Parliament docs)
         │
         ▼
   Processing Layer (src/processing/)
@@ -89,6 +103,18 @@ gpt/
 │   │   ├── kenya_law_scraper.py # Scrapes kenyalaw.org judgments & Gazette
 │   │   ├── laws_africa_client.py# Laws.Africa API client (Constitution priority)
 │   │   ├── judiciary_scraper.py # Scrapes judiciary.go.ke practice directions
+│   │   ├── africanlii_scraper.py# AfricanLII API client (supplementary cases)
+│   │   ├── kenya_law_reports_scraper.py # Kenya Law Reports (official reports)
+│   │   ├── kra_tax_laws_scraper.py # KRA tax legislation & circulars
+│   │   ├── parliament_additional_scraper.py # Parliament order papers, votes, committees
+│   │   ├── hansard_scraper.py   # Parliamentary debates
+│   │   ├── bills_scraper.py     # Parliamentary bills
+│   │   ├── tribunals_scraper.py # Tribunal decisions (15 tribunals)
+│   │   ├── treaties_scraper.py  # International treaties
+│   │   ├── eac_ingestor.py      # EAC legislation
+│   │   ├── lsk_scraper.py       # Law Society of Kenya documents
+│   │   ├── cipit_scraper.py     # CIPIT (IP tribunal) decisions
+│   │   ├── elections_scraper.py # Election petitions & results
 │   │   └── mass_ingest.py       # Orchestrator: runs all sources in sequence
 │   ├── processing/
 │   │   └── document_processor.py# Parse, clean, chunk raw documents to JSONL

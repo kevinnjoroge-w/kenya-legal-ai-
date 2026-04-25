@@ -7,7 +7,7 @@ Centralized configuration using pydantic-settings with .env support.
 from pathlib import Path
 from functools import lru_cache
 from pydantic_settings import BaseSettings
-from pydantic import Field
+from pydantic import Field, field_validator
 
 
 class Settings(BaseSettings):
@@ -31,8 +31,8 @@ class Settings(BaseSettings):
     groq_api_key: str = ""
 
     # ── Embeddings ───────────────────────────────────────────────────────
-    embedding_provider: str = Field(default="huggingface", pattern="^(openai|google|cohere|huggingface)$")
-    embedding_model: str = "mixedbread-ai/mxbai-embed-large-v1"
+    embedding_provider: str = Field(default="cohere", pattern="^(openai|google|cohere|huggingface)$")
+    embedding_model: str = "embed-english-v3.0"
     embedding_dimension: int = 1024
     cohere_api_key: str = ""
 
@@ -57,10 +57,23 @@ class Settings(BaseSettings):
     jwt_expiration_hours: int = 24
     cors_origins: str = "*"
 
+    @field_validator("secret_key")
+    @classmethod
+    def validate_secret_key(cls, v, info):
+        app_env = info.data.get("app_env", "development")
+        if app_env in ["staging", "production"] and v in ["change-this-in-production", "0ed5da20db593231594d6806aaa6961c"]:
+            raise ValueError(
+                f"SECRET_KEY must be set to a secure random value in {app_env} environment. "
+                "Generate one with: openssl rand -hex 32"
+            )
+        return v
+
     # ── Data Paths ───────────────────────────────────────────────────────
     raw_data_dir: str = "data/raw"
     processed_data_dir: str = "data/processed"
     metadata_dir: str = "data/metadata"
+    models_dir: str = "data/models"
+    python_version: str = "3.11.0"
 
     # ── RAG Configuration ────────────────────────────────────────────────
     chunk_size: int = 1000          # characters per chunk

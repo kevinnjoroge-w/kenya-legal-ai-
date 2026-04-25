@@ -25,6 +25,12 @@ from src.ingestion.kenya_gazette_scraper import run_kenya_gazette_ingestion
 from src.ingestion.repealed_statutes_scraper import run_repealed_statutes_ingestion
 from src.ingestion.elections_scraper import run_elections_ingestion
 
+# Additional supplementary sources (AfricanLII, Kenya Law Reports, KRA, Parliament docs)
+from src.ingestion.africanlii_scraper import run_africanlii_ingestion
+from src.ingestion.kenya_law_reports_scraper import run_kenya_law_reports_ingestion
+from src.ingestion.kra_tax_laws_scraper import run_kra_ingestion
+from src.ingestion.parliament_additional_scraper import run_parliament_additional_ingestion
+
 from src.processing.document_processor import process_all_documents
 from src.embedding.embedding_service import EmbeddingService
 from src.processing.document_processor import LegalDocumentProcessor
@@ -216,12 +222,48 @@ async def run_mass_ingestion():
             logger.warning(f"{scraper_class.__name__} failed: {e}")
 
     # ─────────────────────────────────────────────────────────────────
-    # 16. Document Processing → Embedding → Indexing
+    # 16. AfricanLII (Supplementary case law)
     # ─────────────────────────────────────────────────────────────────
-    logger.info("=== [16] Processing All Documents ===")
+    logger.info("=== [16] AfricanLII ===")
+    try:
+        await run_africanlii_ingestion()
+    except Exception as e:
+        logger.warning(f"AfricanLII ingestion failed: {e}")
+
+    # ─────────────────────────────────────────────────────────────────
+    # 17. Kenya Law Reports (Official law reports)
+    # ─────────────────────────────────────────────────────────────────
+    logger.info("=== [17] Kenya Law Reports ===")
+    try:
+        await run_kenya_law_reports_ingestion(limit=100)
+    except Exception as e:
+        logger.warning(f"Kenya Law Reports ingestion failed: {e}")
+
+    # ─────────────────────────────────────────────────────────────────
+    # 18. KRA Tax Laws (Tax legislation, regulations, circulars)
+    # ─────────────────────────────────────────────────────────────────
+    logger.info("=== [18] KRA Tax Laws ===")
+    try:
+        await run_kra_ingestion(limit=50)
+    except Exception as e:
+        logger.warning(f"KRA Tax Laws ingestion failed: {e}")
+
+    # ─────────────────────────────────────────────────────────────────
+    # 19. Parliament Additional Documents (Order Papers, Votes, Committees)
+    # ─────────────────────────────────────────────────────────────────
+    logger.info("=== [19] Parliament Additional Documents ===")
+    try:
+        await run_parliament_additional_ingestion(limit=100)
+    except Exception as e:
+        logger.warning(f"Parliament Additional Documents ingestion failed: {e}")
+
+    # ─────────────────────────────────────────────────────────────────
+    # 20. Document Processing → Embedding → Indexing
+    # ─────────────────────────────────────────────────────────────────
+    logger.info("=== [20] Processing All Documents ===")
     process_all_documents()
 
-    logger.info("=== [17] Indexing to Qdrant ===")
+    logger.info("=== [21] Indexing to Qdrant ===")
     from src.embedding.embedding_service import index_all_processed_documents
     index_all_processed_documents()
 

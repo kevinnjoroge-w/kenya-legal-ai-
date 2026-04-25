@@ -27,7 +27,6 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 # Copy application code
 COPY src ./src
 COPY frontend ./frontend
-COPY .env.example ./.env.production
 
 # Create data directories
 RUN mkdir -p data/raw data/processed data/embeddings

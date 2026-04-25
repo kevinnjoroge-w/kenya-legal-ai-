@@ -15,6 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
+from contextlib import asynccontextmanager
 from src.config.settings import get_settings
 from src.generation.legal_generator import LegalGenerator
 from src.embedding.embedding_service import EmbeddingService
@@ -23,6 +24,35 @@ from src.tools.limitation_checker import check_limitation
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
+
+# Global service instances (initialized in lifespan)
+embedding_service: Optional[EmbeddingService] = None
+legal_generator: Optional[LegalGenerator] = None
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Initialize and cleanup application resources."""
+    global embedding_service, legal_generator
+    # Startup
+    try:
+        embedding_service = EmbeddingService()
+        logger.info("EmbeddingService initialized")
+    except Exception as e:
+        logger.error(f"Failed to initialize EmbeddingService: {e}")
+        embedding_service = None
+
+    try:
+        legal_generator = LegalGenerator()
+        logger.info("LegalGenerator initialized")
+    except Exception as e:
+        logger.error(f"Failed to initialize LegalGenerator: {e}")
+        legal_generator = None
+
+    logger.info("Application startup complete")
+    yield
+    # Shutdown
+    # Cleanup if needed
+    pass
 
 # ─── App Setup ────────────────────────────────────────────────────────────────
 
@@ -36,6 +66,7 @@ app = FastAPI(
     version="0.1.0",
     docs_url="/docs",
     redoc_url="/redoc",
+    lifespan=lifespan,
 )
 
 # Configure CORS
@@ -191,14 +222,16 @@ async def favicon():
 @app.get("/api/v1/health", response_model=HealthResponse)
 async def health_check():
     """Check API and vector database health."""
-    try:
-        embedding_service = EmbeddingService()
-        vector_info = embedding_service.get_collection_info()
-    except Exception as e:
-        vector_info = {"error": str(e)}
+    if embedding_service is None:
+        vector_info = {"error": "EmbeddingService not initialized"}
+    else:
+        try:
+            vector_info = embedding_service.get_collection_info()
+        except Exception as e:
+            vector_info = {"error": str(e)}
 
     return HealthResponse(
-        status="healthy",
+        status="healthy" if embedding_service is not None else "degraded",
         app_name=settings.app_name,
         version="0.1.0",
         vector_db=vector_info,
@@ -249,8 +282,7 @@ async def legal_chat(request: ChatRequest):
         # Assess query for disclaimer level
         discl_level, discl_text = assess_disclaimer(request.query)
 
-        generator = LegalGenerator()
-        result = generator.generate(
+        result = legal_generator.generate(
             query=request.query,
             mode=request.mode,
             document_type=request.document_type,
@@ -301,8 +333,16 @@ async def search_documents(request: SearchRequest):
 
     Returns matching document chunks with relevance scores and metadata.
     """
+    if embedding_service is None:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "error": "service_unavailable",
+                "message": "Vector search service is not available",
+            },
+        )
+
     try:
-        embedding_service = EmbeddingService()
         results = embedding_service.search(
             query=request.query,
             top_k=request.top_k,
@@ -338,8 +378,16 @@ async def search_constitution(
 
     Convenience endpoint that filters results to constitutional provisions only.
     """
+    if embedding_service is None:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "error": "service_unavailable",
+                "message": "Vector search service is not available",
+            },
+        )
+
     try:
-        embedding_service = EmbeddingService()
         results = embedding_service.search(
             query=q,
             top_k=top_k,

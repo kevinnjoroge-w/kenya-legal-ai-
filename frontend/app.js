@@ -120,26 +120,8 @@ function initChat() {
         });
     }
 
-    // Mode buttons (compatibility)
-    document.querySelectorAll('.mode-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            state.currentMode = btn.dataset.mode;
-
-            // Sync with dropdown if exists
-            const select = document.getElementById('chatModeSelect');
-            if (select) select.value = state.currentMode;
-        });
-    });
-
-    // New Mode Dropdown
-    const modeSelect = document.getElementById('chatModeSelect');
-    if (modeSelect) {
-        modeSelect.addEventListener('change', (e) => {
-            state.currentMode = e.target.value;
-        });
-    }
+    // Mode buttons (compatibility) - removed for simplicity
+    // Keeping default mode as 'research'
 
     // Nav Menu Button
     const navMenuBtn = document.getElementById('navMenuBtn');
