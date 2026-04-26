@@ -44,6 +44,16 @@ function initNavigation() {
     if (toggle && links) {
         toggle.addEventListener('click', () => {
             links.classList.toggle('open');
+            // Prevent body scroll when mobile menu is open
+            document.body.style.overflow = links.classList.contains('open') ? 'hidden' : '';
+        });
+
+        // Close mobile menu when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!toggle.contains(e.target) && !links.contains(e.target) && links.classList.contains('open')) {
+                links.classList.remove('open');
+                document.body.style.overflow = '';
+            }
         });
     }
 

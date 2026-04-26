@@ -47,7 +47,22 @@ to look thorough. When you don't know something or the law is silent on it, you 
 directly rather than hedging for three paragraphs.
 
 If someone is clearly a law student, you explain. If someone is clearly a practitioner, 
-you skip the basics. Read the room.\
+you skip the basics. Read the room.
+
+Before answering, outline your reasoning step-by-step to ensure depth:
+1. Identify the core legal issue and relevant provisions.
+2. Trace the precedent chain from foundational cases to recent applications.
+3. Analyze conflicts, weaknesses, or unsettled areas in the law.
+4. Provide multi-angle insights: black-letter law, judicial trends, practical implications, and critiques.
+5. Offer strategic or practical advice for real-world application.
+
+Always include at least one critical opinion (e.g., "This provision is poorly drafted because...") and one practical tip (e.g., "In practice, clients often face this challenge...").
+
+Example of a deep response:
+- For a simple question like "What is Article 50?": Brief summary.
+- For complex: "Article 50 guarantees fair trial rights, but the Supreme Court in *XYZ v ABC* [2020] narrowed it unduly. In practice, this means prosecutors must disclose evidence promptly, or risk acquittal. Critically, the provision lacks clarity on digital evidence, leading to inconsistent applications."
+
+Aim for responses that feel like expert memos: insightful, opinionated, and actionable.\
 """
 
 # Used in RAG mode
@@ -59,7 +74,21 @@ you are a senior advocate — you already know the Constitution and major Acts.
 If the retrieved sources do not cover a necessary point (e.g., a specific Article 
 of the Constitution), DO NOT apologize or state that the sources are missing. 
 Seamlessly integrate your own expert knowledge of Kenyan law to provide a complete 
-analysis.\
+analysis.
+
+Synthesize sources into a coherent narrative: Don't list "Source 1 says X, Source 2 says Y." 
+Instead, weave them into your analysis (e.g., "As established in *Mitu-Bell v Kenya Airports* 
+and reinforced in *XYZ Ltd v ABC*, the principle is...").
+
+For depth, always include:
+- Precedent chain: How cases build on or distinguish each other.
+- Critical analysis: Point out any weak reasoning or outdated precedents.
+- Practical insights: Real-world implications, common pitfalls, or strategic advice.
+- Comparative notes: If relevant, compare with East African or Commonwealth law.
+
+Example: If sources show conflicting High Court decisions, say: "The High Court is split—*Case A* favors X, but *Case B* correctly prioritizes Y because the precedent chain from *Foundational Case* supports it. In practice, this uncertainty leads to forum-shopping."
+
+Ensure responses are 20-30% longer than basic answers, focusing on insight over brevity.\
 """
 
 STYLE_BY_MODE = {
@@ -72,12 +101,28 @@ STYLE_BY_MODE = {
         If your sources don't cover the question well, say so in one sentence 
         then answer from your legal knowledge directly.
         
+        Provide multi-angle analysis:
+        - Black-letter law: The strict legal position.
+        - Judicial application: How courts have interpreted it.
+        - Practical implications: Real-world effects and risks.
+        - Critical insights: Weaknesses, conflicts, or reforms needed.
+        
         Never write section headers for a conversational research response.
         Never write an introduction paragraph — start with the substance.
         Never summarize at the end what you just said.
         
         End with either a follow-up question that would help narrow the analysis,
         or flag the most practically important thing the person should know.
+    """,
+    "research_deep": """
+        Provide an in-depth analysis for legal professionals. Structure the response with clear sections:
+        - Legal Framework: Cite exact provisions and precedents.
+        - Precedent Chain: Trace evolution with 3+ cases, including distinctions.
+        - Multi-Angle Analysis: Black-letter, judicial trends, practical implications, critical critiques.
+        - Comparative Perspective: Compare with East African or Commonwealth law where relevant.
+        - Strategic Advice: Practical tips for practitioners, common pitfalls, reform recommendations.
+        
+        Include at least 3 citations, 2 critiques, and actionable insights. Be opinionated and nuanced.
     """,
     "case_analysis": """
         Analyse this case the way you'd prepare a memo for a partner — 
@@ -151,7 +196,11 @@ QUERY_TEMPLATE = """\
 - Use the provided sources as your primary foundation. Synthesize the law naturally.
 - If the sources are missing key information (like a major Constitutional article), seamlessly supplement with your own expert knowledge. Do not complain that the sources are missing.
 - Open with the actual legal position, not a throat-clearing introduction paragraph.
-- Trace the full precedent chain visible in the sources or your knowledge.
+- Trace the full precedent chain: Cite at least 2-3 cases showing how the law evolved, including any distinctions or overrulings.
+- Provide multi-angle analysis: (a) Strict legal position, (b) Judicial trends and applications, (c) Practical implications and risks, (d) Critical insights or weaknesses in the law.
+- Include at least one opinionated critique (e.g., "This provision is ambiguous and courts have struggled with it...").
+- Offer practical advice: What does this mean for a client? Common pitfalls? Strategic steps?
+- If relevant, compare with East African (e.g., Uganda, Tanzania) or Commonwealth law for broader context.
 
 ## Follow-up Questions:
 After your main answer, suggest 2-3 specific follow-up questions that would help deepen the research or clarify practical application. Format as a bullet list.
@@ -167,9 +216,12 @@ DIRECT_QUERY_TEMPLATE = """\
   the question.
 - Trace the full precedent chain: for each case state the court, year, case \
   number, the principle it established, and how later courts applied or \
-  distinguished it.
+  distinguished it. Include at least 2-3 cases.
 - Provide multi-angle analysis: (a) black-letter law, (b) judicial application, \
   (c) practical implications, (d) unsettled or contested areas.
+- Include a critical insight: Point out any weaknesses, conflicts, or reforms needed.
+- Offer practical advice: Real-world tips, risks, or next steps for a practitioner.
+- If relevant, compare with East African or Commonwealth law for broader context.
 - Use structured headings for anything with more than two sub-points.
 - If you are uncertain about a specific detail (e.g. a case number), say so \
   explicitly — do not guess.
@@ -379,8 +431,7 @@ The original question was:
 Rules for follow-up questions:
 - Each question must be a natural next step from the answer given
 - Each question should be 1 sentence, under 15 words
-- Questions should cover: (1) a practical application, (2) an exception or \
-  edge case, (3) a related but distinct legal area
+- Questions should cover: (1) a practical application or case example, (2) an exception or edge case, (3) a related legal area or reform
 - Return ONLY the 3 questions, one per line, no numbering, no preamble
 
 Questions:"""
@@ -769,6 +820,29 @@ class LegalGenerator:
                 timeout=120.0,
             )
             logger.info(f"Using Groq ({self.model})")
+        elif settings.llm_provider == "mistral":
+            api_key = (settings.mistral_api_key or "").strip()
+            if not api_key:
+                logger.warning("MISTRAL_API_KEY not set, falling back to Groq")
+                # Fallback to Groq
+                groq_key = (settings.groq_api_key or "").strip()
+                if groq_key:
+                    self.client = OpenAI(
+                        api_key=groq_key,
+                        base_url="https://api.groq.com/openai/v1",
+                        timeout=120.0,
+                    )
+                    self.model = "llama-3.3-70b-versatile"  # Use Groq model
+                    logger.info(f"Mistral API key missing, using Groq fallback ({self.model})")
+                else:
+                    raise ValueError("Neither MISTRAL_API_KEY nor GROQ_API_KEY are set")
+            else:
+                self.client = OpenAI(
+                    api_key=api_key,
+                    base_url="https://api.mistral.ai/v1",
+                    timeout=120.0,
+                )
+                logger.info(f"Using Mistral AI ({self.model})")
         elif settings.llm_provider == "google":
             api_key = (settings.google_api_key or "").strip()
             if not api_key:
@@ -807,6 +881,7 @@ class LegalGenerator:
 
     _RAG_TEMPLATES = {
         "research": QUERY_TEMPLATE,
+        "research_deep": QUERY_TEMPLATE,  # Uses same template but with deeper style
         "case_analysis": CASE_ANALYSIS_TEMPLATE,
         "drafting": DOCUMENT_DRAFTING_TEMPLATE,
         "deep_research": DEEP_RESEARCH_TEMPLATE,
@@ -820,6 +895,7 @@ class LegalGenerator:
 
     _DIRECT_TEMPLATES = {
         "research": DIRECT_QUERY_TEMPLATE,
+        "research_deep": DIRECT_QUERY_TEMPLATE,
         "case_analysis": DIRECT_CASE_ANALYSIS_TEMPLATE,
         "drafting": DIRECT_DRAFTING_TEMPLATE,
         "deep_research": DIRECT_DEEP_RESEARCH_TEMPLATE,
@@ -963,6 +1039,15 @@ class LegalGenerator:
 
             response_text = completion.choices[0].message.content
 
+            # Quality check and enhancement for depth modes
+            if mode in ["research_deep", "deep_research"]:
+                is_adequate, feedback = self._check_response_quality(response_text, mode)
+                if not is_adequate:
+                    logger.info(f"Enhancing response quality: {feedback}")
+                    response_text = self._enhance_response_quality(
+                        response_text, feedback, query, mode, temperature
+                    )
+
             # Parse follow-up questions from response
             main_response, follow_up_questions = self._parse_follow_ups(response_text)
 
@@ -1015,6 +1100,15 @@ class LegalGenerator:
 
             response_text = completion.choices[0].message.content
 
+            # Quality check and enhancement for depth modes
+            if mode in ["research_deep", "deep_research"]:
+                is_adequate, feedback = self._check_response_quality(response_text, mode)
+                if not is_adequate:
+                    logger.info(f"Enhancing response quality: {feedback}")
+                    response_text = self._enhance_response_quality(
+                        response_text, feedback, query, mode, temperature
+                    )
+
             # Parse follow-up questions from response
             main_response, follow_up_questions = self._parse_follow_ups(response_text)
 
@@ -1064,26 +1158,92 @@ class LegalGenerator:
 
     # ── Internal: Helpers ──────────────────────────────────────────────────────
 
+    def _check_response_quality(self, response_text: str, mode: str) -> tuple[bool, str]:
+        """
+        Check if the response meets minimum quality standards for legal depth.
+        Returns (is_adequate, feedback_message).
+        """
+        issues = []
+        
+        # Check for citations/cases (at least 1)
+        citation_indicators = ["v.", "Petition", "Civil Case", "Criminal Case", "Article", "Section"]
+        has_citation = any(indicator in response_text for indicator in citation_indicators)
+        if not has_citation:
+            issues.append("missing legal citations or case references")
+        
+        # Check for critique (at least 1 opinionated statement)
+        critique_indicators = ["poorly drafted", "weak reasoning", "inconsistent", "problematic", "critically", "however", "but"]
+        has_critique = any(indicator in response_text for indicator in critique_indicators)
+        if not has_critique:
+            issues.append("missing critical analysis or opinionated critique")
+        
+        # Check for practical advice (at least 1)
+        practical_indicators = ["in practice", "practitioners", "clients should", "common pitfalls", "strategic", "next steps"]
+        has_practical = any(indicator in response_text for indicator in practical_indicators)
+        if not has_practical:
+            issues.append("missing practical advice or real-world implications")
+        
+        if issues:
+            feedback = f"Response lacks depth: {', '.join(issues)}. Please enhance with specific legal citations, critical analysis, and practical guidance."
+            return False, feedback
+        
+        return True, ""
+
+    def _enhance_response_quality(self, response_text: str, feedback: str, query: str, mode: str, temperature: float) -> str:
+        """
+        Re-prompt the LLM to improve response quality based on feedback.
+        """
+        enhancement_prompt = f"""\
+The previous response was inadequate: {feedback}
+
+Original query: {query}
+
+Previous response:
+{response_text}
+
+Please provide an enhanced version that addresses these shortcomings. Focus on adding:
+- Specific legal citations and case references
+- Critical analysis and opinionated critiques
+- Practical advice for real-world application
+
+Enhanced response:"""
+
+        try:
+            messages = [{"role": "user", "content": enhancement_prompt}]
+            completion = self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                temperature=temperature,
+                max_tokens=2048,  # Shorter for enhancement
+            )
+            return completion.choices[0].message.content or response_text
+        except Exception as e:
+            logger.warning(f"Quality enhancement failed: {e}")
+            return response_text
+
     def _parse_follow_ups(self, response_text: str) -> tuple[str, list[str]]:
         """
         Parse the main response and follow-up questions from the LLM output.
         
         Looks for a 'Follow-up Questions:' section and splits accordingly.
         """
-        if "## Follow-up Questions:" in response_text:
-            parts = response_text.split("## Follow-up Questions:", 1)
-            main_response = parts[0].strip()
-            followup_section = parts[1].strip()
-            # Parse bullet points
-            questions = [
-                q.strip().lstrip("-•* ")
-                for q in followup_section.splitlines()
-                if q.strip() and q.strip().startswith(("-", "•", "*", "1.", "2.", "3."))
-            ]
-            return main_response, questions[:3]
-        else:
-            # Fallback: no follow-ups found
-            return response_text.strip(), []
+        # Look for various markers
+        markers = ["## Follow-up Questions:", "Follow-up Questions:", "follow-up questions:", "Some potential follow-up questions to deepen the research or clarify practical application include:"]
+        for marker in markers:
+            if marker in response_text:
+                parts = response_text.split(marker, 1)
+                main_response = parts[0].strip()
+                followup_section = parts[1].strip()
+                # Parse bullet points
+                questions = [
+                    q.strip().lstrip("-•* ")
+                    for q in followup_section.splitlines()
+                    if q.strip() and q.strip().startswith(("-", "•", "*", "1.", "2.", "3."))
+                ]
+                return main_response, questions[:3]
+        
+        # Fallback: no follow-ups found
+        return response_text.strip(), []
 
     def _build_messages(
         self,

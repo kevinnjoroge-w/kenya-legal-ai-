@@ -258,6 +258,11 @@ async def legal_chat(request: ChatRequest):
         key_missing = not api_key or api_key.startswith("your-")
         key_name = "GOOGLE_API_KEY"
         get_key_url = "Get a free key at https://aistudio.google.com/apikey"
+    elif settings.llm_provider == "mistral":
+        api_key = (settings.mistral_api_key or "").strip()
+        key_missing = not api_key or api_key.startswith("your-")
+        key_name = "MISTRAL_API_KEY"
+        get_key_url = "Get a key at https://console.mistral.ai/api-keys/"
     else:
         api_key = (settings.openai_api_key or "").strip()
         key_missing = not api_key or api_key.startswith("sk-your")

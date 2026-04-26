@@ -21,14 +21,15 @@ class Settings(BaseSettings):
     log_level: str = Field(default="INFO", pattern="^(DEBUG|INFO|WARNING|ERROR)$")
 
     # ── LLM Provider ─────────────────────────────────────────────────────
-    llm_provider: str = Field(default="groq", pattern="^(openai|anthropic|ollama|google|groq)$")
-    llm_model: str = "llama-3.3-70b-versatile"
+    llm_provider: str = Field(default="mistral", pattern="^(openai|anthropic|ollama|google|groq|mistral)$")
+    llm_model: str = "mistral-large-latest"
     llm_temperature: float = 0.4
     drafting_temperature: float = 0.2
     openai_api_key: str = ""
     anthropic_api_key: str = ""
     google_api_key: str = ""
     groq_api_key: str = ""
+    mistral_api_key: str = ""
 
     # ── Embeddings ───────────────────────────────────────────────────────
     embedding_provider: str = Field(default="cohere", pattern="^(openai|google|cohere|huggingface)$")

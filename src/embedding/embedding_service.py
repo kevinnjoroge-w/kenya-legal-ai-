@@ -142,6 +142,8 @@ class EmbeddingService:
                     distance=Distance.COSINE,
                 ),
             )
+            # Create payload indexes for local collection
+            self._create_payload_indexes()
             logger.info(
                 f"Created Qdrant collection '{self.collection_name}' "
                 f"(dim={self.embedding_dimension})"
@@ -161,6 +163,8 @@ class EmbeddingService:
                         distance=Distance.COSINE,
                     ),
                 )
+                # Create payload indexes for cloud collection
+                self._create_payload_indexes(cloud=True)
                 logger.info(f"Created Cloud Qdrant collection '{self.collection_name}'")
 
         self._collection_ensured = True
@@ -183,6 +187,9 @@ class EmbeddingService:
             ),
         )
         
+        # Create payload indexes for filtering
+        self._create_payload_indexes()
+        
         # Cloud Qdrant
         if self.qdrant_cloud:
             try:
@@ -197,7 +204,28 @@ class EmbeddingService:
                     distance=Distance.COSINE,
                 ),
             )
+            # Create payload indexes for cloud collection
+            self._create_payload_indexes(cloud=True)
         logger.info("Collection recreation complete.")
+
+    def _create_payload_indexes(self, cloud: bool = False):
+        """Create payload indexes for efficient filtering."""
+        qdrant_client = self.qdrant_cloud if cloud else self.qdrant
+        
+        # Index fields commonly used for filtering
+        index_fields = ["document_type", "court", "date", "citation"]
+        
+        for field in index_fields:
+            try:
+                qdrant_client.create_payload_index(
+                    collection_name=self.collection_name,
+                    field_name=field,
+                    field_type="keyword",  # Most fields are strings
+                )
+                logger.info(f"Created payload index for field: {field}")
+            except Exception as e:
+                logger.warning(f"Failed to create index for {field}: {e}")
+                # Index might already exist, which is fine
 
     @retry(
         retry=retry_if_exception_type((httpx.ConnectError, httpx.ConnectTimeout, httpx.PoolTimeout, Exception)),

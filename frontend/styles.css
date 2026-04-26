@@ -2097,6 +2097,20 @@ body.chat-focus-mode .footer {
         font-size: 14px;
     }
 
+    .welcome-icon {
+        font-size: 48px;
+    }
+
+    .example-queries {
+        gap: 8px;
+    }
+
+    .example-btn {
+        font-size: 13px;
+        padding: 10px 12px;
+        line-height: 1.4;
+    }
+
     .chapter-grid {
         grid-template-columns: 1fr;
         gap: 12px;
