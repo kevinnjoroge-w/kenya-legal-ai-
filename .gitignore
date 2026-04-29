@@ -14,6 +14,7 @@ build/
 
 # Data (large files, don't commit)
 data/raw/
+data
 data/processed/
 *.pdf
 *.csv
