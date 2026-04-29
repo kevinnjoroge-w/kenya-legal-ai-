@@ -22,10 +22,8 @@ from tenacity import (
     before_sleep_log,
 )
 
-try:
-    from sentence_transformers import SentenceTransformer
-except ImportError:
-    SentenceTransformer = None
+# Lazy import for sentence-transformers to save memory
+SentenceTransformer = None
 
 from openai import OpenAI
 import google.generativeai as genai
@@ -78,10 +76,14 @@ class EmbeddingService:
             except ImportError:
                 raise ImportError("cohere package is not installed. Run: pip install cohere")
         elif self.embedding_provider == "huggingface":
+            global SentenceTransformer
             if SentenceTransformer is None:
-                raise ImportError(
-                    "sentence-transformers is not installed. Please run: pip install sentence-transformers"
-                )
+                try:
+                    from sentence_transformers import SentenceTransformer
+                except ImportError:
+                    raise ImportError(
+                        "sentence-transformers is not installed. Please run: pip install sentence-transformers"
+                    )
             logger.info(f"Loading HuggingFace model: {settings.embedding_model}")
             self.hf_model = SentenceTransformer(settings.embedding_model)
 
