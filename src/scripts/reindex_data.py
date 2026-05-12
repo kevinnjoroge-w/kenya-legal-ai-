@@ -31,7 +31,7 @@ def reindex_all():
         return
         
     logger.info(f"Loading chunks from {chunks_file}...")
-    service.index_from_jsonl(chunks_file, batch_size=32)
+    service.index_from_jsonl(chunks_file, batch_size=90)
 
     # 3. Print collection info
     info = service.get_collection_info()

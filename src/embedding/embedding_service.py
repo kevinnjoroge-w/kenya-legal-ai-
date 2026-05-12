@@ -285,7 +285,7 @@ class EmbeddingService:
         reraise=True
     )
     def generate_embeddings_batch(
-        self, texts: list[str], batch_size: int = 100
+        self, texts: list[str], batch_size: int = 90
     ) -> list[list[float]]:
         """
         Generate embeddings for a batch of texts.
@@ -352,7 +352,7 @@ class EmbeddingService:
                         )
                         all_embeddings.extend(response.embeddings.float_)
                         logger.info(f"Embedded Cohere batch {i // cohere_batch + 1}")
-                        time.sleep(1) # Small delay to respect 10k/min ratelimits
+                        time.sleep(15) # Delay to stay under 100k tokens/min trial limit
                         break
                     except Exception as e:
                         if "429" in str(e):
@@ -374,7 +374,7 @@ class EmbeddingService:
             
         return []
 
-    def index_chunks(self, chunks: list[DocumentChunk], batch_size: int = 50):
+    def index_chunks(self, chunks: list[DocumentChunk], batch_size: int = 90):
         """
         Embed and index document chunks into Qdrant.
 
@@ -468,7 +468,7 @@ class EmbeddingService:
 
         logger.info(f"Total chunks indexed: {len(chunks)}")
 
-    def index_from_jsonl(self, jsonl_path: Path, batch_size: int = 50):
+    def index_from_jsonl(self, jsonl_path: Path, batch_size: int = 90):
         """
         Stream chunks from a JSONL file and index them in batches.
         Prevents loading thousands of objects into memory.
