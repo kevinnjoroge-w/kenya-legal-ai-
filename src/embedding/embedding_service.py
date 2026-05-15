@@ -72,7 +72,10 @@ class EmbeddingService:
                 raise ValueError("COHERE_API_KEY is not set.")
             try:
                 import cohere
-                self.cohere_client = cohere.ClientV2(api_key=settings.cohere_api_key)
+                # Use V1 Client — trial keys are supported on /v1/embed.
+                # ClientV2 targets /v2/embed which requires a paid plan and
+                # is blocked by Cohere's WAF on cloud/datacenter IPs with trial keys.
+                self.cohere_client = cohere.Client(api_key=settings.cohere_api_key)
             except ImportError:
                 raise ImportError("cohere package is not installed. Run: pip install cohere")
         elif self.embedding_provider == "huggingface":
@@ -262,11 +265,16 @@ class EmbeddingService:
                 "retrieval_query" if input_type == "search_query"
                 else "retrieval_document"
             )
-            result = genai.embed_content(
+            kwargs: dict = dict(
                 model=self.google_model,
                 content=text,
                 task_type=task_type,
             )
+            # text-embedding-004 supports Matryoshka truncation — pin to the
+            # same dimension as the Qdrant collection so no reindex is needed.
+            if self.embedding_dimension != 768:
+                kwargs["output_dimensionality"] = self.embedding_dimension
+            result = genai.embed_content(**kwargs)
             return result["embedding"]
         elif self.embedding_provider == "cohere":
             try:
@@ -274,9 +282,8 @@ class EmbeddingService:
                     texts=[text],
                     model=self.embedding_model,
                     input_type=input_type,  # "search_query" for retrieval
-                    embedding_types=["float"]
                 )
-                return response.embeddings.float_[0]
+                return response.embeddings[0]
             except Exception as e:
                 if "429" in str(e):
                     logger.error("Cohere API rate limit exceeded (429).")
@@ -321,35 +328,40 @@ class EmbeddingService:
             
         elif self.embedding_provider == "google":
             all_embeddings = []
-            for i in range(0, len(texts), batch_size):
-                batch = texts[i : i + batch_size]
-                
-                # Simple retry logic for rate limits
+            # Google embed_content accepts a list directly (up to 100 items)
+            google_batch = min(batch_size, 100)
+            for i in range(0, len(texts), google_batch):
+                batch = texts[i : i + google_batch]
+
+                kwargs: dict = dict(
+                    model=self.google_model,
+                    content=batch,
+                    task_type="retrieval_document",
+                )
+                if self.embedding_dimension != 768:
+                    kwargs["output_dimensionality"] = self.embedding_dimension
+
                 max_retries = 3
                 for attempt in range(max_retries):
                     try:
-                        result = genai.embed_content(
-                            model=self.google_model,
-                            content=batch,
-                            task_type="retrieval_document",
-                        )
+                        result = genai.embed_content(**kwargs)
                         all_embeddings.extend(result["embedding"])
-                        logger.info(f"Embedded Google batch {i // batch_size + 1}")
+                        logger.info(f"Embedded Google batch {i // google_batch + 1}")
                         break
                     except Exception as e:
                         if "429" in str(e) and attempt < max_retries - 1:
-                            wait_time = 60  # Wait a full minute if rate limited
+                            wait_time = 60
                             logger.warning(f"Rate limited. Waiting {wait_time}s before retry...")
                             time.sleep(wait_time)
                         else:
                             raise e
         elif self.embedding_provider == "cohere":
             all_embeddings = []
-            # Cohere allows up to 96 inputs per batch call
+            # Cohere V1 allows up to 96 inputs per batch call
             cohere_batch = min(batch_size, 96)
             for i in range(0, len(texts), cohere_batch):
                 batch = texts[i : i + cohere_batch]
-                
+
                 max_retries = 3
                 for attempt in range(max_retries):
                     try:
@@ -357,17 +369,16 @@ class EmbeddingService:
                             texts=batch,
                             model=self.embedding_model,
                             input_type="search_document",
-                            embedding_types=["float"]
                         )
-                        all_embeddings.extend(response.embeddings.float_)
+                        all_embeddings.extend(response.embeddings)
                         logger.info(f"Embedded Cohere batch {i // cohere_batch + 1}")
-                        time.sleep(15) # Delay to stay under 100k tokens/min trial limit
+                        time.sleep(15)  # Stay under 100k tokens/min trial limit
                         break
                     except Exception as e:
                         if "429" in str(e):
                             logger.error("Cohere API rate limit exceeded (429) during batch processing.")
                             logger.error("Suggestion: Switch EMBEDDING_PROVIDER to 'huggingface' in .env for local embeddings.")
-                        
+
                         if attempt < max_retries - 1:
                             wait_time = 5 * (attempt + 1)
                             logger.warning(f"Cohere API error, waiting {wait_time}s... ({e})")
