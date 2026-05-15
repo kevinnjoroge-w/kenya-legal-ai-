@@ -69,6 +69,19 @@ class Settings(BaseSettings):
             )
         return v
 
+    @field_validator("cohere_api_key")
+    @classmethod
+    def validate_embedding_key(cls, v, info):
+        """Fail fast if the embedding provider's key is missing in production."""
+        app_env = info.data.get("app_env", "development")
+        provider = info.data.get("embedding_provider", "cohere")
+        if app_env in ["staging", "production"] and provider == "cohere" and not v:
+            raise ValueError(
+                "COHERE_API_KEY must be set when EMBEDDING_PROVIDER=cohere in production. "
+                "Add it to your Render environment variables."
+            )
+        return v
+
     # ── Data Paths ───────────────────────────────────────────────────────
     raw_data_dir: str = "data/raw"
     processed_data_dir: str = "data/processed"

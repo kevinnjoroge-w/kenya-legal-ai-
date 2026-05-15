@@ -236,12 +236,16 @@ class EmbeddingService:
         before_sleep=before_sleep_log(logger, logging.WARNING),
         reraise=True
     )
-    def generate_embedding(self, text: str) -> list[float]:
+    def generate_embedding(
+        self, text: str, input_type: str = "search_query"
+    ) -> list[float]:
         """
         Generate an embedding vector for the given text.
 
         Args:
-            text: Text to embed
+            text:       Text to embed.
+            input_type: Cohere input_type — use "search_query" for user queries
+                        (default) and "search_document" when indexing documents.
 
         Returns:
             Embedding vector as a list of floats
@@ -253,10 +257,15 @@ class EmbeddingService:
             )
             return response.data[0].embedding
         elif self.embedding_provider == "google":
+            # Map Cohere-style input_type to Google task_type
+            task_type = (
+                "retrieval_query" if input_type == "search_query"
+                else "retrieval_document"
+            )
             result = genai.embed_content(
                 model=self.google_model,
                 content=text,
-                task_type="retrieval_document",
+                task_type=task_type,
             )
             return result["embedding"]
         elif self.embedding_provider == "cohere":
@@ -264,7 +273,7 @@ class EmbeddingService:
                 response = self.cohere_client.embed(
                     texts=[text],
                     model=self.embedding_model,
-                    input_type="search_document",
+                    input_type=input_type,  # "search_query" for retrieval
                     embedding_types=["float"]
                 )
                 return response.embeddings.float_[0]
