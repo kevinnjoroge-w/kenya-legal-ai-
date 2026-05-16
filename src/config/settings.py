@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     mistral_api_key: str = ""
 
     # ── Embeddings ───────────────────────────────────────────────────────
-    embedding_provider: str = Field(default="cohere", pattern="^(openai|google|cohere|huggingface)$")
+    embedding_provider: str = Field(default="cohere", pattern="^(openai|google|cohere|huggingface|mistral)$")
     embedding_model: str = "embed-english-v3.0"
     embedding_dimension: int = 1024
     cohere_api_key: str = ""

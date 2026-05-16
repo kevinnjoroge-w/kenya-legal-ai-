@@ -84,6 +84,15 @@ class EmbeddingService:
                 )
             except ImportError:
                 raise ImportError("cohere package is not installed. Run: pip install cohere")
+        elif self.embedding_provider == "mistral":
+            if not settings.mistral_api_key:
+                logger.error("MISTRAL_API_KEY is missing. Check your .env file.")
+                raise ValueError("MISTRAL_API_KEY is not set.")
+            try:
+                from mistralai import Mistral
+                self.mistral_client = Mistral(api_key=settings.mistral_api_key)
+            except ImportError:
+                raise ImportError("mistralai package is not installed. Run: pip install mistralai")
         elif self.embedding_provider == "huggingface":
             global SentenceTransformer
             if SentenceTransformer is None:
@@ -295,6 +304,12 @@ class EmbeddingService:
                     logger.error("Cohere API rate limit exceeded (429).")
                     logger.error("Suggestion: Switch EMBEDDING_PROVIDER to 'huggingface' in .env for local embeddings.")
                 raise e
+        elif self.embedding_provider == "mistral":
+            response = self.mistral_client.embeddings.create(
+                model=self.embedding_model,
+                inputs=[text]
+            )
+            return response.data[0].embedding
         elif self.embedding_provider == "huggingface" and self.hf_model:
             return self.hf_model.encode(text).tolist()
         return []
@@ -388,6 +403,31 @@ class EmbeddingService:
                         if attempt < max_retries - 1:
                             wait_time = 5 * (attempt + 1)
                             logger.warning(f"Cohere API error, waiting {wait_time}s... ({e})")
+                            time.sleep(wait_time)
+                        else:
+                            raise e
+            return all_embeddings
+        elif self.embedding_provider == "mistral":
+            all_embeddings = []
+            # Mistral allows up to 100 inputs per batch call
+            mistral_batch = min(batch_size, 100)
+            for i in range(0, len(texts), mistral_batch):
+                batch = texts[i : i + mistral_batch]
+                
+                max_retries = 3
+                for attempt in range(max_retries):
+                    try:
+                        response = self.mistral_client.embeddings.create(
+                            model=self.embedding_model,
+                            inputs=batch
+                        )
+                        all_embeddings.extend([d.embedding for d in response.data])
+                        logger.info(f"Embedded Mistral batch {i // mistral_batch + 1}")
+                        break
+                    except Exception as e:
+                        if attempt < max_retries - 1:
+                            wait_time = 5 * (attempt + 1)
+                            logger.warning(f"Mistral API error, waiting {wait_time}s... ({e})")
                             time.sleep(wait_time)
                         else:
                             raise e
