@@ -230,6 +230,12 @@ async def health_check():
         except Exception as e:
             vector_info = {"error": str(e)}
 
+    # Get first 5 chars of Cohere API key for debugging
+    co_key = settings.cohere_api_key or ""
+    co_prefix = co_key[:5] + "..." if len(co_key) > 5 else "missing"
+    if vector_info:
+        vector_info["cohere_key"] = co_prefix
+
     return HealthResponse(
         status="healthy" if embedding_service is not None else "degraded",
         app_name=settings.app_name,
