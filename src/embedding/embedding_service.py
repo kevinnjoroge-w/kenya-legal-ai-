@@ -91,8 +91,9 @@ class EmbeddingService:
             try:
                 from mistralai.client import Mistral
                 self.mistral_client = Mistral(api_key=settings.mistral_api_key)
-            except ImportError:
-                raise ImportError("mistralai package is not installed. Run: pip install mistralai")
+            except ImportError as e:
+                logger.error(f"Mistral import failed: {e}")
+                raise ImportError(f"mistralai package import failed: {e}. Run: pip install mistralai>=2.4.0")
         elif self.embedding_provider == "huggingface":
             global SentenceTransformer
             if SentenceTransformer is None:
