@@ -946,9 +946,9 @@ class LegalGenerator:
         models_to_try = [self.model]
         
         # If using Groq and the primary is the 70B model, add fallbacks
-        # Groq's 70B has tight rate limits on the free tier, but Mixtral and 8B are separated
+        # Groq's 70B has tight rate limits on the free tier, but 8B is separated
         if "70b" in self.model or "versatile" in self.model:
-            models_to_try.extend(["mixtral-8x7b-32768", "llama-3.1-8b-instant"])
+            models_to_try.append("llama-3.1-8b-instant")
             
         for i, model in enumerate(models_to_try):
             try:
