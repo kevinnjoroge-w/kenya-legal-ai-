@@ -906,6 +906,11 @@ class LegalGenerator:
         """
         history = history or []
         
+        # 1. Conversational greeting check & warm bypass
+        if self._is_greeting(query):
+            logger.info(f"Conversational greeting detected: '{query}'. Bypassing RAG and research mode.")
+            return self._generate_greeting_response(query, mode)
+        
         # Determine temperature dynamically based on mode if not provided
         if temperature is None:
             settings = get_settings()
@@ -939,6 +944,77 @@ class LegalGenerator:
     def deep_research(self, query: str, **kwargs) -> dict:
         """Shortcut for deep scholarly research."""
         return self.generate(query, mode="deep_research", **kwargs)
+
+    def _is_greeting(self, query: str) -> bool:
+        """Detect if the query is a simple conversational greeting or generic intro."""
+        q = query.strip().lower().strip("?!.,-")
+        greetings = {
+            "hello", "hi", "hey", "jambo", "habari", "mambo", "sasa", "hello there", "hi there",
+            "good morning", "good afternoon", "good evening", "greetings", "yo", "sup", "howdy",
+            "test", "testing"
+        }
+        # Check if the query is a single word or short phrase that matches common greetings
+        if q in greetings:
+            return True
+        # Also check if it starts with a greeting followed by simple words (e.g., "hello assistant")
+        words = q.split()
+        if len(words) <= 3 and words[0] in greetings:
+            return True
+        return False
+
+    def _generate_greeting_response(self, query: str, mode: str) -> dict:
+        """Generate a warm, helpful, non-RAG response for simple greetings."""
+        system_prompt = (
+            "You are Kenya Legal AI, a friendly, expert, and professional legal assistant "
+            "trained on the Kenyan legal framework. Respond to this user greeting warmly and professionally. "
+            "Introduce yourself briefly as a specialized legal assistant and mention that you can help with "
+            "legal research, case analysis, document drafting, constitutional interpretation, "
+            "and Swahili legal translations. Keep the response concise, engaging, and end with a question "
+            "asking how you can help them with their legal research today."
+        )
+        
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": query}
+        ]
+        
+        try:
+            completion, used_model = self._create_chat_completion(
+                messages=messages,
+                temperature=0.7,
+                max_tokens=150,
+            )
+            return {
+                "response": completion.choices[0].message.content,
+                "sources": [],
+                "mode": mode,
+                "model": used_model,
+                "rag_used": False,
+                "follow_up_questions": [
+                    "What are the requirements for a valid contract in Kenya?",
+                    "Can you help me draft a tenant agreement?",
+                    "Explain Article 27 of the Constitution of Kenya."
+                ]
+            }
+        except Exception as e:
+            logger.error(f"Greeting response failed: {e}")
+            # Secure fallback response
+            return {
+                "response": (
+                    "Hello! I am Kenya Legal AI, your specialized legal research assistant. "
+                    "I can help you with legal research, case analysis, document drafting, "
+                    "and navigating the Kenyan legal system. How can I assist you with your legal questions today?"
+                ),
+                "sources": [],
+                "mode": mode,
+                "model": self.model,
+                "rag_used": False,
+                "follow_up_questions": [
+                    "What are the requirements for a valid contract in Kenya?",
+                    "Can you help me draft a tenant agreement?",
+                    "Explain Article 27 of the Constitution of Kenya."
+                ]
+            }
 
     def _truncate_messages_for_tpm(self, messages, max_chars=18000):
         """Truncate messages to fit within tight TPM limits (e.g. 6000 tokens)."""
