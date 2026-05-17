@@ -832,21 +832,31 @@ class LegalGenerator:
 
         self.retrieval = None
         self._rag_available = False
+        self._rag_error = None
 
-        # Try to set up RAG retrieval — fall back to direct mode if unavailable
+        # Attempt eager RAG setup — failures are logged but do NOT crash the
+        # server. The flag is re-checked lazily on every request so a transient
+        # cold-start network hiccup does not permanently disable retrieval.
+        self._try_init_rag()
+
+    def _try_init_rag(self):
+        """Attempt to initialise the RAG pipeline. Safe to call multiple times."""
         try:
             from src.retrieval.retrieval_pipeline import RetrievalPipeline
             self.retrieval = RetrievalPipeline()
-            from src.embedding.embedding_service import EmbeddingService
-            es = EmbeddingService()
-            info = es.get_collection_info()
-            if "error" not in info:
-                self._rag_available = True
-                logger.info("RAG mode active — vector DB connected with documents")
+            info = self.retrieval.embedding_service.get_collection_info()
+            if "error" in info:
+                self._rag_available = False
+                self._rag_error = info["error"]
+                logger.warning(f"RAG startup probe failed — vector DB error: {info['error']}")
             else:
-                logger.info("Direct LLM mode — vector DB has no collection yet")
+                self._rag_available = True
+                self._rag_error = None
+                logger.info(f"RAG mode active — {info.get('points_count', '?')} vectors in collection")
         except Exception as e:
-            logger.info(f"Direct LLM mode — RAG unavailable: {e}")
+            self._rag_available = False
+            self._rag_error = str(e)
+            logger.warning(f"RAG unavailable at startup (will retry per-request): {e}")
 
     # ── RAG Templates ──────────────────────────────────────────────────────────
 
@@ -919,14 +929,20 @@ class LegalGenerator:
             else:
                 temperature = getattr(settings, "llm_temperature", 0.4)
 
+        # Lazy RAG init — retry if startup probe failed (e.g. cold-start timeout)
+        if not self._rag_available:
+            self._try_init_rag()
+
         if self._rag_available:
             return self._generate_rag(
                 query, mode, document_type, court,
                 history, temperature, max_tokens
             )
         else:
+            logger.warning(f"RAG not available, using direct mode. Last error: {self._rag_error}")
             return self._generate_direct(
-                query, mode, history, temperature, max_tokens
+                query, mode, history, temperature, max_tokens,
+                rag_error=self._rag_error
             )
 
     def ask(self, query: str, **kwargs) -> dict:

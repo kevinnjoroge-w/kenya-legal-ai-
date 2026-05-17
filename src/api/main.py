@@ -221,7 +221,8 @@ async def favicon():
 
 @app.get("/api/v1/health", response_model=HealthResponse)
 async def health_check():
-    """Check API and vector database health."""
+    """Check API and vector database health. Exposes full RAG diagnostics."""
+    # --- Vector DB ---
     if embedding_service is None:
         vector_info = {"error": "EmbeddingService not initialized"}
     else:
@@ -230,14 +231,32 @@ async def health_check():
         except Exception as e:
             vector_info = {"error": str(e)}
 
-    # Get first 5 chars of Cohere API key for debugging
-    co_key = settings.cohere_api_key or ""
-    co_prefix = co_key[:5] + "..." if len(co_key) > 5 else "missing"
-    if vector_info:
-        vector_info["cohere_key"] = co_prefix
+    # --- RAG pipeline status from generator ---
+    rag_available = False
+    rag_error = None
+    if legal_generator is not None:
+        rag_available = legal_generator._rag_available
+        rag_error = legal_generator._rag_error
+
+    # --- API key presence checks (never expose full key) ---
+    def key_status(k):
+        return f"{k[:6]}..." if k and len(k) > 6 else ("set (short)" if k else "MISSING")
+
+    diagnostics = {
+        "rag_available": rag_available,
+        "rag_error": rag_error,
+        "groq_api_key": key_status(settings.groq_api_key),
+        "mistral_api_key": key_status(settings.mistral_api_key),
+        "qdrant_host": settings.qdrant_host,
+        "qdrant_api_key": key_status(settings.qdrant_api_key),
+        "embedding_provider": settings.embedding_provider,
+        "llm_provider": settings.llm_provider,
+        "llm_model": settings.llm_model,
+    }
+    vector_info.update(diagnostics)
 
     return HealthResponse(
-        status="healthy" if embedding_service is not None else "degraded",
+        status="healthy" if rag_available else "degraded",
         app_name=settings.app_name,
         version="0.1.0",
         vector_db=vector_info,
