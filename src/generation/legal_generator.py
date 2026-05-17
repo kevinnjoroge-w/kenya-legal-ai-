@@ -940,6 +940,35 @@ class LegalGenerator:
         """Shortcut for deep scholarly research."""
         return self.generate(query, mode="deep_research", **kwargs)
 
+    def _create_chat_completion(self, messages, temperature, max_tokens):
+        """Helper to create a chat completion with automatic rate-limit fallbacks."""
+        # Try primary model first
+        models_to_try = [self.model]
+        
+        # If using Groq and the primary is the 70B model, add fallbacks
+        # Groq's 70B has tight rate limits on the free tier, but Mixtral and 8B are separated
+        if "70b" in self.model or "versatile" in self.model:
+            models_to_try.extend(["mixtral-8x7b-32768", "llama-3.1-8b-instant"])
+            
+        for i, model in enumerate(models_to_try):
+            try:
+                completion = self.client.chat.completions.create(
+                    model=model,
+                    messages=messages,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                )
+                return completion, model
+            except Exception as e:
+                err_str = str(e).lower()
+                is_rate_limit = "429" in err_str or "rate_limit" in err_str
+                if is_rate_limit and i < len(models_to_try) - 1:
+                    logger.warning(f"Groq Model {model} hit rate limit (429). Falling back to {models_to_try[i+1]}...")
+                    continue
+                else:
+                    raise e
+        raise RuntimeError("All models failed to generate response")
+
     # ── Internal: RAG Generation ───────────────────────────────────────────────
 
     def _generate_rag(
@@ -1001,8 +1030,7 @@ class LegalGenerator:
         messages = self._build_messages(RAG_SYSTEM_PROMPT, history, user_prompt, mode)
 
         try:
-            completion = self.client.chat.completions.create(
-                model=self.model,
+            completion, used_model = self._create_chat_completion(
                 messages=messages,
                 temperature=temperature,
                 max_tokens=max_tokens,
@@ -1039,7 +1067,7 @@ class LegalGenerator:
                 "response": main_response,
                 "sources": sources,
                 "mode": mode,
-                "model": self.model,
+                "model": used_model,
                 "rag_used": True,
                 "follow_up_questions": follow_up_questions,
                 "tokens_used": {
@@ -1062,8 +1090,7 @@ class LegalGenerator:
         messages = self._build_messages(SYSTEM_PROMPT, history, user_prompt, mode)
 
         try:
-            completion = self.client.chat.completions.create(
-                model=self.model,
+            completion, used_model = self._create_chat_completion(
                 messages=messages,
                 temperature=temperature,
                 max_tokens=max_tokens,
@@ -1087,7 +1114,7 @@ class LegalGenerator:
                 "response": main_response,
                 "sources": [],
                 "mode": mode,
-                "model": self.model,
+                "model": used_model,
                 "rag_used": False,
                 "follow_up_questions": follow_up_questions,
                 "tokens_used": {
@@ -1181,8 +1208,7 @@ Enhanced response:"""
 
         try:
             messages = [{"role": "user", "content": enhancement_prompt}]
-            completion = self.client.chat.completions.create(
-                model=self.model,
+            completion, _ = self._create_chat_completion(
                 messages=messages,
                 temperature=temperature,
                 max_tokens=2048,  # Shorter for enhancement
@@ -1256,12 +1282,10 @@ Enhanced response:"""
         Generate 3 suggested follow-up questions after a legal answer.
 
         Uses a lightweight, fast call with a low token budget.
-        Returns an empty list on failure so it never breaks the main response.
         """
         try:
             prompt = FOLLOWUP_TEMPLATE.format(query=query)
-            completion = self.client.chat.completions.create(
-                model=self.model,
+            completion, _ = self._create_chat_completion(
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.7,   # slightly more creative for variety
                 max_tokens=120,    # 3 short questions is all we need
