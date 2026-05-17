@@ -1108,16 +1108,20 @@ class LegalGenerator:
     ) -> dict:
         """Generate a response grounded in retrieved source documents."""
         # Retrieve relevant context and sources in one call
-        raw_results = self.retrieval.retrieve(
-            query=query,
-            document_type=document_type,
-            court=court,
-        )
+        try:
+            raw_results = self.retrieval.retrieve(
+                query=query,
+                document_type=document_type,
+                court=court,
+            )
+        except Exception as e:
+            logger.error(f"RAG retrieval failed: {e}")
+            return self._generate_direct(query, mode, history, temperature, max_tokens, rag_error=f"Retrieval failed: {e}")
 
         if not raw_results:
             # No relevant documents found — fall back to direct mode
             logger.info("No RAG context found — falling back to direct mode")
-            return self._generate_direct(query, mode, history, temperature, max_tokens)
+            return self._generate_direct(query, mode, history, temperature, max_tokens, rag_error="No matching documents found in vector database")
 
         # Build context from results
         context_parts = []
@@ -1209,11 +1213,11 @@ class LegalGenerator:
             }
         except Exception as e:
             logger.error(f"RAG generation failed: {e}")
-            return self._generate_direct(query, mode, history, temperature, max_tokens)
+            return self._generate_direct(query, mode, history, temperature, max_tokens, rag_error=f"Generation failed: {e}")
 
     # ── Internal: Direct Generation ────────────────────────────────────────────
 
-    def _generate_direct(self, query, mode, history, temperature, max_tokens) -> dict:
+    def _generate_direct(self, query, mode, history, temperature, max_tokens, rag_error=None) -> dict:
         """Generate a response using direct LLM knowledge (no RAG)."""
         template = self._DIRECT_TEMPLATES.get(mode, DIRECT_QUERY_TEMPLATE)
         user_prompt = template.format(query=query)
@@ -1248,6 +1252,7 @@ class LegalGenerator:
                 "model": used_model,
                 "rag_used": False,
                 "follow_up_questions": follow_up_questions,
+                "rag_error": rag_error,
                 "tokens_used": {
                     "prompt": completion.usage.prompt_tokens,
                     "completion": completion.usage.completion_tokens,

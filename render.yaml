@@ -1,5 +1,5 @@
 services:
-  # 1. Backend API Service
+  # Backend API Service
   - type: web
     name: kenya-legal-ai
     env: python
@@ -8,29 +8,12 @@ services:
     envVars:
       - key: APP_ENV
         value: production
-      - key: QDRANT_HOST
-        fromService:
-          type: web
-          name: qdrant-db
-          property: host
-      - key: QDRANT_PORT
-        value: 6333
-      # Add other keys like GROQ_API_KEY, LAWS_AFRICA_API_KEY manually in Render Dashboard
+      # All other keys (GROQ_API_KEY, MISTRAL_API_KEY, QDRANT_HOST,
+      # QDRANT_PORT, QDRANT_API_KEY, QDRANT_COLLECTION, EMBEDDING_PROVIDER,
+      # LLM_PROVIDER, LLM_MODEL, SECRET_KEY) must be set manually in the
+      # Render Dashboard → Environment tab. Do NOT define them here so that
+      # dashboard values are never shadowed by this file.
     disk:
       name: legal-data
       mountPath: /app/data
-      sizeGB: 10
-
-  # 2. Qdrant Vector Database
-  - type: web
-    name: qdrant-db
-    env: docker
-    dockerContext: .
-    dockerfilePath: Dockerfile.qdrant
-    envVars:
-      - key: QDRANT__STORAGE__PATH
-        value: /qdrant/storage
-    disk:
-      name: qdrant-storage
-      mountPath: /qdrant/storage
       sizeGB: 10
