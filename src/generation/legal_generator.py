@@ -940,6 +940,57 @@ class LegalGenerator:
         """Shortcut for deep scholarly research."""
         return self.generate(query, mode="deep_research", **kwargs)
 
+    def _truncate_messages_for_tpm(self, messages, max_chars=18000):
+        """Truncate messages to fit within tight TPM limits (e.g. 6000 tokens)."""
+        total_chars = sum(len(m.get("content", "")) for m in messages)
+        if total_chars <= max_chars:
+            return messages
+
+        logger.info(f"Payload size ({total_chars} chars) exceeds safety threshold ({max_chars} chars). Truncating...")
+        
+        # Make a copy of messages
+        pruned = [m.copy() for m in messages]
+        
+        # 1. Prune history (remove all turns between system prompt and user prompt)
+        if len(pruned) > 2:
+            logger.info("Pruning conversation history to fit TPM limit.")
+            pruned = [pruned[0], pruned[-1]]
+            total_chars = sum(len(m.get("content", "")) for m in pruned)
+            if total_chars <= max_chars:
+                return pruned
+
+        # 2. Prune retrieved RAG chunks in the user prompt
+        user_content = pruned[-1].get("content", "")
+        if "## Retrieved Legal Sources:" in user_content and "## Case / Topic to Analyse:" in user_content:
+            parts = user_content.split("## Case / Topic to Analyse:")
+            context_part = parts[0]
+            query_part = "## Case / Topic to Analyse:" + parts[1]
+            
+            # Extract chunks from context_part
+            context_prefix = "## Retrieved Legal Sources:\n"
+            actual_context = context_part.replace("## Retrieved Legal Sources:\n", "").strip()
+            chunks = actual_context.split("\n---\n")
+            
+            # Keep chunks from the beginning until we hit the char limit
+            keep_chunks = []
+            current_len = len(context_prefix) + len(query_part)
+            for chunk in chunks:
+                if current_len + len(chunk) + 5 > max_chars:
+                    break
+                keep_chunks.append(chunk)
+                current_len += len(chunk) + 5
+                
+            if not keep_chunks:
+                new_user_content = f"## Retrieved Legal Sources:\n[Context omitted to fit rate limits]\n\n{query_part}"
+            else:
+                new_context = "\n---\n".join(keep_chunks)
+                new_user_content = f"## Retrieved Legal Sources:\n{new_context}\n\n{query_part}"
+                
+            pruned[-1]["content"] = new_user_content
+            logger.info(f"Truncated RAG context chunks to fit TPM limit. New size: {len(new_user_content)} chars.")
+            
+        return pruned
+
     def _create_chat_completion(self, messages, temperature, max_tokens):
         """Helper to create a chat completion with automatic rate-limit fallbacks."""
         # Try primary model first
@@ -952,9 +1003,13 @@ class LegalGenerator:
             
         for i, model in enumerate(models_to_try):
             try:
+                active_messages = messages
+                if model == "llama-3.1-8b-instant":
+                    active_messages = self._truncate_messages_for_tpm(messages)
+                    
                 completion = self.client.chat.completions.create(
                     model=model,
-                    messages=messages,
+                    messages=active_messages,
                     temperature=temperature,
                     max_tokens=max_tokens,
                 )
