@@ -242,37 +242,13 @@ CASE_ANALYSIS_TEMPLATE = """\
 {query}
 
 ## Structured Analysis Required:
-Write a thorough legal analysis with ALL of the following sections:
+Write a short, highly precise, and insightful legal analysis. You MUST break it down using the exact headings below:
 
-### 1. Background & Facts
-Key parties, procedural history, and factual matrix — cite [Source N].
-
-### 2. Legal Issues
-Enumerate each distinct legal question before the court.
-
-### 3. Applicable Legal Framework
-Statutes, constitutional provisions, and prior case law the court relied on \
-— cite [Source N] for each.
-
-### 4. Court's Decision (Holding)
-The outcome on each issue, with the court's reasoning — cite [Source N].
-
-### 5. Ratio Decidendi
-The binding legal principle(s) extracted from the decision.
-
-### 6. Obiter Dicta
-Notable observations that are persuasive but not binding.
-
-### 7. Jurisprudential Significance
-Impact on Kenyan law: does it settle, reverse, or complicate prior \
-jurisprudence? Cite [Source N].
-
-### 8. Critique / Commentary
-Any scholarly or judicial criticism; unresolved tensions the decision creates.
-
-### 9. Subsequent Application
-How later courts (visible in sources) applied, distinguished, or departed from \
-this decision — cite [Source N].
+**Facts**: [2-3 sentences summarizing the core events, parties, and procedural history. Cite Source N].
+**Legal Concepts**: [Comma-separated list of the primary legal doctrines, statutes, or constitutional provisions involved].
+**Analysis**: [A sharp, concise breakdown of the judge's reasoning. Does it make logical sense? Cite Source N].
+**Potential Biases/Nuances**: [Identify any judicial biases, underlying societal context, political pressures, or legal ambiguities present in the judgment].
+**Conclusion**: [A one-sentence takeaway of the jurisprudential significance].
 
 Cite all sources using [Source N] format.
 
@@ -282,21 +258,16 @@ DIRECT_CASE_ANALYSIS_TEMPLATE = """\
 ## Case / Topic to Analyse:
 {query}
 
-## Structured Analysis Required — provide ALL sections:
+## Structured Analysis Required:
+Write a short, highly precise, and insightful legal analysis. You MUST break it down using the exact headings below:
 
-### 1. Background & Facts
-### 2. Legal Issues
-### 3. Applicable Legal Framework (cite specific Articles, Acts, and cases)
-### 4. Court's Decision & Reasoning
-### 5. Ratio Decidendi
-### 6. Obiter Dicta (if notable)
-### 7. Jurisprudential Significance
-### 8. Critique / Unresolved Questions
-### 9. Subsequent Application in Kenyan courts (if known)
+**Facts**: [2-3 sentences summarizing the core events, parties, and procedural history].
+**Legal Concepts**: [Comma-separated list of the primary legal doctrines or statutes involved].
+**Analysis**: [A sharp, concise breakdown of the judge's reasoning. Does it make logical sense?].
+**Potential Biases/Nuances**: [Identify any judicial biases, underlying societal context, or legal ambiguities present].
+**Conclusion**: [A one-sentence takeaway of the jurisprudential significance].
 
-For every case cited: state the court level, year, case/petition number, and \
-the specific principle it established. If you are uncertain about a detail, \
-flag it explicitly.
+For every case cited: state the court level, year, and case/petition number. If you are uncertain about a detail, flag it explicitly.
 
 ## Analysis:"""
 

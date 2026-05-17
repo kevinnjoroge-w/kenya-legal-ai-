@@ -89,7 +89,7 @@ class EmbeddingService:
                 logger.error("MISTRAL_API_KEY is missing. Check your .env file.")
                 raise ValueError("MISTRAL_API_KEY is not set.")
             try:
-                from mistralai import Mistral
+                from mistralai.client import Mistral
                 self.mistral_client = Mistral(api_key=settings.mistral_api_key)
             except ImportError:
                 raise ImportError("mistralai package is not installed. Run: pip install mistralai")
@@ -415,11 +415,16 @@ class EmbeddingService:
                 batch = texts[i : i + mistral_batch]
                 
                 max_retries = 3
+                
+                # Truncate texts to prevent exceeding Mistral's 8192 token limit
+                # 10,000 characters is aggressively safe to ensure it stays under 8,192 tokens even for dense tables.
+                truncated_batch = [t[:10000] if isinstance(t, str) else t for t in batch]
+                
                 for attempt in range(max_retries):
                     try:
                         response = self.mistral_client.embeddings.create(
                             model=self.embedding_model,
-                            inputs=batch
+                            inputs=truncated_batch
                         )
                         all_embeddings.extend([d.embedding for d in response.data])
                         logger.info(f"Embedded Mistral batch {i // mistral_batch + 1}")

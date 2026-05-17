@@ -20,12 +20,12 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def main():
-    settings = get_settings()
-    data_path = Path(settings.processed_data_dir) / "finetuning_dataset.jsonl"
+    # Setup paths
+    project_root = Path(__file__).parent.parent.parent
+    data_path = project_root / "data" / "processed" / "finetune_dataset.jsonl"
     
     if not data_path.exists():
-        logger.error(f"Training data not found at {data_path}")
-        logger.error("Run `python src/scripts/prepare_finetuning_data.py` first.")
+        logger.error(f"Dataset not found at {data_path}. Please run generate_finetune_data.py first!")
         return
 
     logger.info("Initializing Unsloth FastLanguageModel...")

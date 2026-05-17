@@ -21,8 +21,18 @@ def reindex_all():
     
     logger.info(f"Starting re-indexing with provider: {settings.embedding_provider}, model: {settings.embedding_model}")
     
-    # 1. Recreate collection (wipe old vectors, create new with 1024 dim)
-    service.recreate_collection()
+    # 1. Clear old vectors
+    # We have commented this out per user request so the DB is no longer wiped on each run.
+    # from qdrant_client.http import models
+    # logger.info("Wiping old vectors from collection...")
+    # try:
+    #     service.qdrant.delete(
+    #         collection_name=settings.qdrant_collection,
+    #         points_selector=models.Filter()
+    #     )
+    #     logger.info("Successfully wiped old vectors.")
+    # except Exception as e:
+    #     logger.error(f"Failed to wipe vectors: {e}. You may need to delete them manually in the Qdrant Cloud dashboard.")
     
     # 2. Index using streaming from jsonl
     chunks_file = Path(settings.processed_data_dir) / "all_documents.jsonl"
