@@ -247,7 +247,7 @@ Write a short, highly precise, and insightful legal analysis. You MUST break it 
 **Facts**: [2-3 sentences summarizing the core events, parties, and procedural history. Cite Source N].
 **Legal Concepts**: [Comma-separated list of the primary legal doctrines, statutes, or constitutional provisions involved].
 **Analysis**: [A sharp, concise breakdown of the judge's reasoning. Does it make logical sense? Cite Source N].
-**Potential Biases/Nuances**: [Identify any judicial biases, underlying societal context, political pressures, or legal ambiguities present in the judgment].
+**Comparative Precedent & Nuances**: [How does this case compare to other relevant cases? What distinguishes its facts from prior rulings, and how did that affect the decision? Are there any departures from established precedent?].
 **Conclusion**: [A one-sentence takeaway of the jurisprudential significance].
 
 Cite all sources using [Source N] format.
@@ -264,7 +264,7 @@ Write a short, highly precise, and insightful legal analysis. You MUST break it 
 **Facts**: [2-3 sentences summarizing the core events, parties, and procedural history].
 **Legal Concepts**: [Comma-separated list of the primary legal doctrines or statutes involved].
 **Analysis**: [A sharp, concise breakdown of the judge's reasoning. Does it make logical sense?].
-**Potential Biases/Nuances**: [Identify any judicial biases, underlying societal context, or legal ambiguities present].
+**Comparative Precedent & Nuances**: [How does this case compare to other relevant cases? What distinguishes its facts from prior rulings, and how did that affect the decision? Are there any departures from established precedent?].
 **Conclusion**: [A one-sentence takeaway of the jurisprudential significance].
 
 For every case cited: state the court level, year, and case/petition number. If you are uncertain about a detail, flag it explicitly.
