@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     app_host: str = "0.0.0.0"
     app_port: int = 8000
     log_level: str = Field(default="INFO", pattern="^(DEBUG|INFO|WARNING|ERROR)$")
+    prefer_reasoning_over_structure: bool = True
+    require_argument_validation: bool = True
 
     # ── LLM Provider ─────────────────────────────────────────────────────
     llm_provider: str = Field(default="mistral", pattern="^(openai|anthropic|ollama|google|groq|mistral)$")

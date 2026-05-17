@@ -1,17 +1,16 @@
 """
-Kenya Legal AI — LLM Generation Service
-=========================================
-Handles prompt construction and LLM generation for legal Q&A.
-Supports:
-  - RAG mode   : retrieves context from Qdrant, then generates
-  - Direct mode: uses the LLM's built-in knowledge (fallback)
-  - Grounding disclosure: explicit notice when no RAG context was found
-  - Conversation history: multi-turn awareness across all modes
-  - Follow-up questions: suggested next queries after each answer
-  - Modes:
-      research | case_analysis | drafting | deep_research
-      petition_drafting | judicial_review | devolution
-      cross_reference | plain_language | swahili
+Kenya Legal AI — Context-Aware Legal Reasoning Engine
+=======================================================
+Transformed from a template-filling system to a reasoning engine that constructs
+valid legal arguments naturally. Features:
+  - RAG mode   : retrieves context from Qdrant, then reasons through it
+  - Direct mode: uses expert legal knowledge as fallback
+  - User context profiling: adapts response to user type, knowledge, urgency
+  - Argument-based quality validation (not structure-based)
+  - Lazy RAG init with per-request retry
+  - Modes: research | case_analysis | drafting | deep_research
+           petition_drafting | judicial_review | devolution
+           cross_reference | plain_language | swahili
 """
 
 import logging
@@ -93,53 +92,62 @@ Ensure responses are 20-30% longer than basic answers, focusing on insight over 
 
 STYLE_BY_MODE = {
     "research": """
-        Answer this like you're explaining it to a colleague over coffee — 
-        direct, confident, with the important nuances called out naturally. 
-        When you retrieve sources, synthesize them — don't list them. 
-        Never say "Source [N] says" or "the provided sources indicate." 
-        Instead say "the Land Act 2012" or "in Mitu-Bell v Kenya Airports Authority."
-        If your sources don't cover the question well, say so in one sentence 
-        then answer from your legal knowledge directly.
-        
-        Provide multi-angle analysis:
-        - Black-letter law: The strict legal position.
-        - Judicial application: How courts have interpreted it.
-        - Practical implications: Real-world effects and risks.
-        - Critical insights: Weaknesses, conflicts, or reforms needed.
-        
-        Never write section headers for a conversational research response.
-        Never write an introduction paragraph — start with the substance.
-        Never summarize at the end what you just said.
-        
-        End with either a follow-up question that would help narrow the analysis,
-        or flag the most practically important thing the person should know.
+        Answer like a colleague explaining over coffee — direct, confident,
+        with nuances called out naturally. Build an argument, don't list points.
+        Distinguish settled law from contested areas. Show your reasoning
+        (because... therefore... this means...). Synthesize sources naturally —
+        never say 'Source N says'. End with the ONE practical thing they must understand.
     """,
     "research_deep": """
-        Provide an in-depth analysis for legal professionals. Structure the response with clear sections:
-        - Legal Framework: Cite exact provisions and precedents.
-        - Precedent Chain: Trace evolution with 3+ cases, including distinctions.
-        - Multi-Angle Analysis: Black-letter, judicial trends, practical implications, critical critiques.
-        - Comparative Perspective: Compare with East African or Commonwealth law where relevant.
-        - Strategic Advice: Practical tips for practitioners, common pitfalls, reform recommendations.
-        
-        Include at least 3 citations, 2 critiques, and actionable insights. Be opinionated and nuanced.
+        Provide scholarly depth without being verbose:
+        - The foundational principles (explained clearly, not just quoted)
+        - The precedent chain: how courts evolved their interpretation
+        - Where courts disagree and WHY the disagreement exists
+        - Your assessment of which line of reasoning is stronger and why
+        - Comparative perspective (East Africa / Commonwealth) if relevant
+        - The practical implication for someone actually dealing with this
+        Aim for the depth of a High Court judgment. Precision over padding.
     """,
     "case_analysis": """
-        Analyse this case the way you'd prepare a memo for a partner — 
-        sharp, opinionated where the law allows opinions, and honest about 
-        where the judgment is weak or where you'd have argued differently.
-        Structure your analysis with clear headings like: Introduction, Judicial Application, 
-        Practical Effect, and Unsettled Areas.
+        Analyze like you're preparing a memo for a senior partner:
+        Sharp, opinionated where the law allows, honest about weak reasoning.
+        Show your thinking — is the judge's core reasoning sound? How does this
+        case fit the broader jurisprudence? What distinguishes it from prior cases?
+        Where would you have argued differently? What's the lasting precedential
+        significance vs. what's case-specific? Don't fill a template. Build an analysis.
     """,
     "drafting": """
-        Draft this like a careful draftsman who also understands why each 
-        clause exists. Flag anything the client should push back on. 
-        Don't just produce a template — produce a document with a point of view.
+        Draft carefully, but don't hide behind formality. Each clause must have
+        a purpose. After drafting, annotate: WHY this clause, WHAT it protects
+        against, WHAT the client might want to change. Flag negotiation points
+        and customization spots with [CUSTOMISE: reason].
     """,
     "deep_research": """
-        This needs depth, but depth doesn't mean length. Cover what matters, 
-        skip what doesn't, and tell the reader what the law actually means 
-        in practice — not just what it says on paper.
+        Research memo for legal professionals. Build it like educating a colleague:
+        - What's the legal principle and why does it matter?
+        - How did it evolve (precedent chain)?
+        - Where is it unsettled or contested?
+        - What do other jurisdictions do differently?
+        - What are the practical implications?
+        - What reforms are needed (if applicable)?
+        Opinionated, specific, grounded in actual cases and provisions.
+    """,
+    "petition_drafting": """
+        Draft a petition that actually persuades — not a template to fill.
+        Facts should tell a story of why the constitutional violation matters.
+        Legal arguments should show why the law compels a particular outcome.
+        Don't be wooden. Flag customization points with [CUSTOMISE: reason].
+    """,
+    "judicial_review": """
+        Analyze whether judicial review is available and appropriate.
+        Work through the tests methodically, but explain WHY each test matters
+        for THIS case specifically, not in the abstract.
+    """,
+    "plain_language": """
+        Explain like you're talking to a client who has never been to a lawyer.
+        Simple words, short sentences. No unexplained legal jargon.
+        Start with what's at stake, then walk through what the law says and
+        what they can do. Include free legal aid contacts where appropriate.
     """
 }
 
@@ -189,46 +197,40 @@ QUERY_TEMPLATE = """\
 
 ---
 
-## User's Question:
+## Question:
 {query}
 
-## Response Instructions:
-- Use the provided sources as your primary foundation. Synthesize the law naturally.
-- If the sources are missing key information (like a major Constitutional article), seamlessly supplement with your own expert knowledge. Do not complain that the sources are missing.
-- Open with the actual legal position, not a throat-clearing introduction paragraph.
-- Trace the full precedent chain: Cite at least 2-3 cases showing how the law evolved, including any distinctions or overrulings.
-- Provide multi-angle analysis: (a) Strict legal position, (b) Judicial trends and applications, (c) Practical implications and risks, (d) Critical insights or weaknesses in the law.
-- Include at least one opinionated critique (e.g., "This provision is ambiguous and courts have struggled with it...").
-- Offer practical advice: What does this mean for a client? Common pitfalls? Strategic steps?
-- If relevant, compare with East African (e.g., Uganda, Tanzania) or Commonwealth law for broader context.
+Using the sources above as your primary foundation, construct a coherent legal
+argument — not a structured report. Before writing, think through:
+1. What is the ACTUAL legal question? (Often different from what's literally asked.)
+2. Which facts or provisions shift the outcome?
+3. What would a strong opposing argument be, and how do you counter it?
+4. Which retrieved sources directly control this? Which are peripheral?
+5. What is the ONE insight that changes how they understand this?
 
-## Follow-up Questions:
-After your main answer, suggest 2-3 specific follow-up questions that would help deepen the research or clarify practical application. Format as a bullet list.
+Build your answer like a lawyer reasoning through the problem aloud. Distinguish
+between settled law and genuinely contested areas. Show your reasoning — because...
+therefore... this means... Cite sources by their actual name, not "Source N".
+If sources are incomplete, supplement from your own legal knowledge without apology.
+
+End with the practical takeaway: what should this person actually do or know?
+
+After your answer, list 2-3 follow-up questions (as a bullet list) that would
+deepen understanding or clarify practical application.
 
 ## Answer:"""
 
 DIRECT_QUERY_TEMPLATE = """\
-## User's Question:
+## Question:
 {query}
 
-## Response Instructions:
-- Open by citing the exact Article/Section (and its wording) most central to \
-  the question.
-- Trace the full precedent chain: for each case state the court, year, case \
-  number, the principle it established, and how later courts applied or \
-  distinguished it. Include at least 2-3 cases.
-- Provide multi-angle analysis: (a) black-letter law, (b) judicial application, \
-  (c) practical implications, (d) unsettled or contested areas.
-- Include a critical insight: Point out any weaknesses, conflicts, or reforms needed.
-- Offer practical advice: Real-world tips, risks, or next steps for a practitioner.
-- If relevant, compare with East African or Commonwealth law for broader context.
-- Use structured headings for anything with more than two sub-points.
-- If you are uncertain about a specific detail (e.g. a case number), say so \
-  explicitly — do not guess.
-- End with a plain-English summary of the most critical point.
+Using your expert legal knowledge, construct a coherent legal argument. 
+Identify the controlling provisions or precedents and explain HOW they apply 
+to the user's situation. Do not just list points. Show your reasoning: 
+state the law, apply it to the facts (even if implied), and conclude.
+Highlight any areas of legal uncertainty.
 
-## Follow-up Questions:
-After your main answer, suggest 2-3 specific follow-up questions that would help deepen the research or clarify practical application. Format as a bullet list.
+After your answer, suggest 2-3 specific follow-up questions.
 
 ## Answer:"""
 
@@ -241,16 +243,15 @@ CASE_ANALYSIS_TEMPLATE = """\
 ## Case / Topic to Analyse:
 {query}
 
-## Structured Analysis Required:
-Write a short, highly precise, and insightful legal analysis. You MUST break it down using the exact headings below:
+Using the sources above, analyze this case or legal position like a senior advocate.
+Focus your reasoning on:
+1. What was the core legal problem?
+2. Is the judge's reasoning logically sound? Where are the gaps?
+3. How does this decision fit into (or disrupt) the broader jurisprudence?
+4. What is the lasting practical impact?
 
-**Facts**: [2-3 sentences summarizing the core events, parties, and procedural history. Cite Source N].
-**Legal Concepts**: [Comma-separated list of the primary legal doctrines, statutes, or constitutional provisions involved].
-**Analysis**: [A sharp, concise breakdown of the judge's reasoning. Does it make logical sense? Cite Source N].
-**Comparative Precedent & Nuances**: [How does this case compare to other relevant cases? What distinguishes its facts from prior rulings, and how did that affect the decision? Are there any departures from established precedent?].
-**Conclusion**: [A one-sentence takeaway of the jurisprudential significance].
-
-Cite all sources using [Source N] format.
+Do not just summarise the facts. Build a critical, opinionated analysis.
+Cite specific sources by name.
 
 ## Analysis:"""
 
@@ -258,16 +259,14 @@ DIRECT_CASE_ANALYSIS_TEMPLATE = """\
 ## Case / Topic to Analyse:
 {query}
 
-## Structured Analysis Required:
-Write a short, highly precise, and insightful legal analysis. You MUST break it down using the exact headings below:
+Analyze this case or legal position like a senior advocate.
+Focus your reasoning on:
+1. What was the core legal problem?
+2. Is the judge's reasoning logically sound? Where are the gaps?
+3. How does this decision fit into (or disrupt) the broader jurisprudence?
+4. What is the lasting practical impact?
 
-**Facts**: [2-3 sentences summarizing the core events, parties, and procedural history].
-**Legal Concepts**: [Comma-separated list of the primary legal doctrines or statutes involved].
-**Analysis**: [A sharp, concise breakdown of the judge's reasoning. Does it make logical sense?].
-**Comparative Precedent & Nuances**: [How does this case compare to other relevant cases? What distinguishes its facts from prior rulings, and how did that affect the decision? Are there any departures from established precedent?].
-**Conclusion**: [A one-sentence takeaway of the jurisprudential significance].
-
-For every case cited: state the court level, year, and case/petition number. If you are uncertain about a detail, flag it explicitly.
+Do not just summarise the facts. Build a critical, opinionated analysis.
 
 ## Analysis:"""
 
@@ -280,16 +279,12 @@ DOCUMENT_DRAFTING_TEMPLATE = """\
 ## Drafting Request:
 {query}
 
-## Drafting Instructions:
-- Follow standard Kenyan legal drafting conventions and applicable statutes \
-  — cite [Source N] for each statutory requirement incorporated.
-- Include ALL mandatory clauses required by Kenyan law for this document type.
-- After each key clause, add a brief annotation (in square brackets) \
-  explaining the statutory basis and why the clause is required.
-- Flag any clauses that require customisation with [CUSTOMISE: reason].
-- Flag any areas where professional legal review is essential before execution.
-- End with a checklist of steps required to execute / register / give legal \
-  effect to the document under Kenyan law.
+Draft the required document, but do not just act as a form-filler.
+For every substantive clause, reason through why it is necessary based on the 
+provided sources or Kenyan law generally. 
+Add annotations (e.g. [NOTE: ...]) explaining the strategic reason for a clause 
+or flagging where the user must make a strategic choice.
+Flag customization points with [CUSTOMISE: reason].
 
 ## Draft:"""
 
@@ -297,14 +292,11 @@ DIRECT_DRAFTING_TEMPLATE = """\
 ## Drafting Request:
 {query}
 
-## Drafting Instructions:
-- Follow standard Kenyan legal drafting conventions.
-- Cite the specific Act, Section, or Regulation that governs each clause.
-- Include ALL mandatory clauses required by Kenyan law.
-- Annotate each key clause with its statutory basis in square brackets.
-- Flag customisation points with [CUSTOMISE: reason].
-- Flag areas requiring professional review.
-- End with an execution/registration checklist.
+Draft the required document, but do not just act as a form-filler.
+For every substantive clause, reason through why it is necessary under Kenyan law.
+Add annotations (e.g. [NOTE: ...]) explaining the strategic reason for a clause 
+or flagging where the user must make a strategic choice.
+Flag customization points with [CUSTOMISE: reason].
 
 ## Draft:"""
 
@@ -317,78 +309,34 @@ DEEP_RESEARCH_TEMPLATE = """\
 ## Research Topic:
 {query}
 
-## Scholarly Analysis Required:
+Build a comprehensive scholarly legal argument using the sources above.
+Do not use rigid structural templates. Instead, reason through the topic 
+methodically:
+- Explain the foundational principles and why they matter.
+- Trace the chain of precedent showing how the law evolved.
+- Analyze conflicting authorities and explain why the conflict exists.
+- Evaluate the practical implications.
 
-Write a comprehensive legal research memorandum with ALL of the following \
-sections. Each section should be substantive — aim for the depth of a \
-High Court judgment or law review article.
+Your argument should flow logically from one point to the next, building 
+a complete picture of the law. Cite sources by their actual names.
 
----
-
-### I. Executive Summary (3–5 sentences)
-The core legal position, key authority, and most critical practical implication.
-
-### II. Legislative & Constitutional Framework
-Full text of the governing Articles / Sections. Trace their history: original \
-enactment → amendments → current form. Cite [Source N] for each provision.
-
-### III. Judicial Interpretation & Precedent Chain
-A chronological analysis of how courts have interpreted this area of law, \
-starting from the earliest authority visible in the sources to the most recent. \
-For each judgment: court level, year, case number, facts, holding, and principle \
-established. Cite [Source N].
-
-### IV. Conflicting Authorities & Unsettled Areas
-Where courts have reached different conclusions, summarise each line of \
-authority and explain why the conflict exists. Is there a Supreme Court \
-pronouncement that resolves it? If not, what are the competing arguments?
-
-### V. Comparative Perspective
-How do Uganda, Tanzania, South Africa, or India (as applicable and visible in \
-sources) approach this area? Does the comparative position support or undermine \
-the Kenyan approach?
-
-### VI. Practical Implications
-For individuals / companies / government: what does this legal position mean in \
-practice? Include compliance requirements, time limits, penalties, and available \
-remedies.
-
-### VII. Recent Developments
-Any statutory amendments, recent judgments, or government policy shifts (visible \
-in sources) that affect the analysis.
-
-### VIII. Conclusion & Recommendations
-A clear statement of the law as it currently stands, any reform recommendations \
-where the law is inadequate, and suggested next steps for a person affected by \
-this issue.
-
----
-
-Cite all sources using [Source N] format throughout.
-
-## Memorandum:"""
+## Scholarly Analysis:"""
 
 DIRECT_DEEP_RESEARCH_TEMPLATE = """\
 ## Research Topic:
 {query}
 
-## Scholarly Analysis Required:
+Build a comprehensive scholarly legal argument.
+Do not use rigid structural templates. Instead, reason through the topic 
+methodically:
+- Explain the foundational principles and why they matter.
+- Trace the chain of precedent showing how the law evolved.
+- Analyze conflicting authorities and explain why the conflict exists.
+- Evaluate the practical implications.
 
-Write a comprehensive legal research memorandum covering:
+Your argument should flow logically from one point to the next.
 
-### I. Executive Summary
-### II. Legislative & Constitutional Framework
-### III. Judicial Interpretation & Precedent Chain (chronological)
-### IV. Conflicting Authorities & Unsettled Areas
-### V. Comparative Perspective (East Africa / Commonwealth)
-### VI. Practical Implications
-### VII. Recent Developments
-### VIII. Conclusion & Recommendations
-
-For every case cited: court level, year, case/petition number, facts, holding, \
-and principle established. Flag any details you are uncertain about explicitly.
-
-## Memorandum:"""
+## Scholarly Analysis:"""
 
 # Template for generating follow-up question suggestions
 FOLLOWUP_TEMPLATE = """\
@@ -419,48 +367,11 @@ PETITION_DRAFTING_TEMPLATE = """\
 ## Petition Request:
 {query}
 
-## Draft a Constitutional Petition with all of the following sections:
-
-### Preamble
-IN THE HIGH COURT OF KENYA
-AT [STATION]
-CONSTITUTIONAL PETITION NO. ___ OF ____
-
-IN THE MATTER OF THE CONSTITUTION OF KENYA 2010
-AND IN THE MATTER OF [brief subject matter]
-
-BETWEEN:
-[PETITIONER NAME] — PETITIONER
-AND
-[RESPONDENT NAME] — RESPONDENT
-
----
-
-### Part 1: Locus Standi (Article 22 CoK)
-State the petitioner's standing to bring the petition under Article 22(1)–(2). \
-Is this an individual, a public interest petitioner, or a group? Cite [Source N] \
-where relevant.
-
-### Part 2: Constitutional Provisions Alleged to be Violated
-List each Article breached, quoting its text, and explain the nature of the breach.
-
-### Part 3: Factual Background
-Set out the material facts chronologically. Number each paragraph.
-
-### Part 4: Legal Arguments
-For each constitutional breach: (a) state the provision, (b) cite supporting \
-case law [Source N], (c) explain how the facts constitute a breach.
-
-### Part 5: Reliefs Sought (Article 23 CoK)
-List specific reliefs: declarations, orders of mandamus/certiorari/prohibition, \
-conservatory orders, damages, costs. Tie each relief to Article 23(3)(a)–(f).
-
-### Part 6: Certificate of Urgency (if applicable)
-State grounds for urgency; cite the threshold test from *Gatirau Peter Munya v \
-Dickson Mwenda Kithinji* [2014] KECA.
-
----
-Flag customisation points with [CUSTOMISE: reason]. Cite all sources using [Source N].
+Draft a persuasive constitutional petition. The facts must tell a story of why 
+the constitutional violation matters, and the legal arguments must reason 
+from the provided sources to show why the law compels a particular outcome. 
+Do not be wooden or overly formulaic. Reason through the violation and the relief sought.
+Flag customization points with [CUSTOMISE: reason].
 
 ## Draft:"""
 
@@ -468,17 +379,11 @@ DIRECT_PETITION_DRAFTING_TEMPLATE = """\
 ## Petition Request:
 {query}
 
-## Draft a full Constitutional Petition (Article 22/258 CoK) including:
-### Preamble (Court, Parties, Matter)
-### Part 1: Locus Standi — Article 22(1)/(2)
-### Part 2: Constitutional Provisions Alleged Violated (quote each Article)
-### Part 3: Factual Background (numbered paragraphs)
-### Part 4: Legal Arguments (provision + case law + application to facts)
-### Part 5: Reliefs Sought under Article 23(3)(a)–(f)
-### Part 6: Certificate of Urgency (if applicable)
-
-Annotate each section with the statutory/constitutional basis. Flag \
-customisation points with [CUSTOMISE: reason].
+Draft a persuasive constitutional petition. The facts must tell a story of why 
+the constitutional violation matters, and the legal arguments must show why 
+the law compels a particular outcome. 
+Do not be wooden or overly formulaic. Reason through the violation and the relief sought.
+Flag customization points with [CUSTOMISE: reason].
 
 ## Draft:"""
 
@@ -493,41 +398,10 @@ JUDICIAL_REVIEW_TEMPLATE = """\
 ## Judicial Review Request:
 {query}
 
-## Structured Judicial Review Analysis (Order 53 CPR; s. 8 Law Reform Act Cap. 26):
-
-### 1. Preliminary: Is Judicial Review Available?
-Does this matter involve a public law decision by a public body? Cite [Source N].
-
-### 2. Time Limitation
-Has the application been brought promptly and within 3 months? State the date \
-of the impugned decision and calculate the timeline.
-
-### 3. Ground 1 — Illegality
-Did the decision-maker act outside their statutory powers (ultra vires)? \
-Cite the empowering statute [Source N] and Kenyan case law on illegality.
-
-### 4. Ground 2 — Irrationality (Wednesbury Unreasonableness)
-Was the decision so unreasonable that no reasonable authority could have made it? \
-Apply the test from *Council of Civil Service Unions v Minister for Civil Service* [1985] \
-as received in Kenyan courts [Source N].
-
-### 5. Ground 3 — Procedural Impropriety
-Were the rules of natural justice breached? (a) Audi alteram partem — was the \
-applicant heard? (b) Nemo judex in causa sua — was there apparent bias? \
-Cite [Source N] for each sub-ground.
-
-### 6. Legitimate Expectations
-Were any substantive or procedural legitimate expectations defeated? [Source N]
-
-### 7. Remedies Available
-**Certiorari** (quash the decision) / **Mandamus** (compel performance) / \
-**Prohibition** (prevent future breach) / **Declaration** / **Injunction**. \
-State which remedy is appropriate and why.
-
-### 8. Conservatory / Stay Order
-Grounds for interlocutory relief pending the main application.
-
-Cite all sources using [Source N].
+Reason through whether judicial review is available and appropriate for this case.
+Methodically apply the tests (illegality, irrationality, procedural impropriety, etc.), 
+but explain WHY each test matters for THIS specific situation, rather than just 
+stating the abstract rule. Rely on the provided sources to build your argument.
 
 ## Analysis:"""
 
@@ -535,19 +409,10 @@ DIRECT_JUDICIAL_REVIEW_TEMPLATE = """\
 ## Judicial Review Request:
 {query}
 
-## Structured Analysis — Order 53 CPR / s.8 Law Reform Act (Cap. 26):
-
-### 1. Availability of Judicial Review
-### 2. Time Limitation (promptly & within 3 months)
-### 3. Ground 1: Illegality (ultra vires — cite empowering statute)
-### 4. Ground 2: Irrationality (Wednesbury test — cite Kenyan authority)
-### 5. Ground 3: Procedural Impropriety (natural justice — audi alteram partem & nemo judex)
-### 6. Legitimate Expectations
-### 7. Remedies (certiorari / mandamus / prohibition / declaration)
-### 8. Conservatory Relief
-
-For every case cited state: court level, year, case number, and the specific \
-principle applied.
+Reason through whether judicial review is available and appropriate for this case.
+Methodically apply the tests (illegality, irrationality, procedural impropriety, etc.), 
+but explain WHY each test matters for THIS specific situation, rather than just 
+stating the abstract rule.
 
 ## Analysis:"""
 
@@ -562,37 +427,10 @@ DEVOLUTION_TEMPLATE = """\
 ## Devolution / County Law Question:
 {query}
 
-## Devolution Analysis Framework (Chapter 11 CoK; Fourth Schedule):
-
-### 1. Legal Framework
-Applicable constitutional provisions: Articles 6, 174–200, Fourth Schedule. \
-Quote the relevant text from [Source N].
-
-### 2. Fourth Schedule Classification
-Is the function in question listed in Part 1 (national) or Part 2 (county) of \
-the Fourth Schedule? If it spans both, identify the point of intersection. \
-Cite [Source N].
-
-### 3. Concurrent / Overlapping Functions
-Where both levels have competence, apply the supremacy rule under Article 191: \
-(a) conflict with national legislation acting within its mandate → national law \
-prevails; (b) national legislation that unnecessarily limits county authority → \
-may be unconstitutional. Cite relevant Intergovernmental Relations Act provisions \
-[Source N].
-
-### 4. Relevant Institutional Framework
-- Intergovernmental Relations Act, No. 2 of 2012
-- County Governments Act, No. 17 of 2012
-- Public Finance Management Act (county fund provisions)
-- Relevant sector legislation (health, land, education, etc.) [Source N]
-
-### 5. Judicial Treatment
-How have courts resolved similar national–county competence disputes? \
-Cite [Source N] for each case.
-
-### 6. Practical Resolution
-What practical steps are available to resolve the dispute or assert the \
-county's rights?
+Reason through this devolution conflict using the provided sources. 
+Don't just list the Fourth Schedule functions; analyze where the functions 
+intersect and apply the supremacy rules to build a coherent argument for 
+how the conflict should be resolved.
 
 ## Analysis:"""
 
@@ -600,17 +438,10 @@ DIRECT_DEVOLUTION_TEMPLATE = """\
 ## Devolution / County Law Question:
 {query}
 
-## Devolution Analysis Framework:
-
-### 1. Legal Framework (Chapter 11, Arts 174–200, Fourth Schedule CoK)
-### 2. Fourth Schedule Classification (Part 1 national / Part 2 county)
-### 3. Concurrent Functions & Article 191 Supremacy Rule
-### 4. Relevant Statutes (County Governments Act, IGA 2012, PFM Act, sector laws)
-### 5. Judicial Treatment of National–County Competence Disputes
-### 6. Practical Resolution Pathway
-
-For cases cited state court level, year, case number, and the devolution \
-principle established.
+Reason through this devolution conflict. 
+Don't just list the Fourth Schedule functions; analyze where the functions 
+intersect and apply the supremacy rules to build a coherent argument for 
+how the conflict should be resolved.
 
 ## Analysis:"""
 
@@ -625,57 +456,21 @@ CROSS_REFERENCE_TEMPLATE = """\
 ## Statutory Cross-Reference Request:
 {query}
 
-## Statutory Relationship Map:
+Analyze how the relevant provisions across different statutes or regulations 
+interact based on the sources provided. Reason through the hierarchy or conflict 
+between them to provide a synthesized view of the law.
 
-### 1. Parent Act(s)
-Identify the primary/parent statute(s) governing this area. Quote the long title \
-and the relevant sections that authorise subsidiary legislation or cross-reference \
-other Acts [Source N].
-
-### 2. Subsidiary Legislation
-List all Legal Notices, Regulations, Rules, and Orders made under the parent Act(s) \
-that are relevant to the query. For each: LN number, year, subject matter [Source N].
-
-### 3. Related Acts (Must Be Read Together)
-Identify complementary Acts that must be considered alongside the parent Act. \
-For each, explain: (a) the relationship (it amends / supplements / provides \
-definitions for / conflicts with the parent Act), and (b) which specific sections \
-interact [Source N].
-
-### 4. Conflict Resolution Rules
-Where Acts contradict each other, apply: (a) later Act prevails (leges posteriores \
-priores contrarias abrogant), (b) specific Act prevails over general Act, or \
-(c) Article 259(1)(b) purposive interpretation. Cite Kenyan case law on statutory \
-conflict [Source N].
-
-### 5. Definitions & Interpretation
-Flag key terms that are defined differently across the related statutes — \
-this is a common source of legal disputes.
-
-### 6. Practical Reading Guide
-Step-by-step guidance on how to navigate the statutory web for this specific matter.
-
-Cite all sources using [Source N].
-
-## Cross-Reference Map:"""
+## Analysis:"""
 
 DIRECT_CROSS_REFERENCE_TEMPLATE = """\
 ## Statutory Cross-Reference Request:
 {query}
 
-## Statutory Relationship Map:
+Analyze how the relevant provisions across different statutes or regulations 
+interact. Reason through the hierarchy or conflict between them to provide 
+a synthesized view of the law.
 
-### 1. Parent Act(s) — long title, relevant authorising sections
-### 2. Subsidiary Legislation (LNs, Regulations, Rules, Orders)
-### 3. Related Acts (must read together — state relationship & interacting sections)
-### 4. Conflict Resolution Rules (leges posteriores, lex specialis, Art. 259 purposive)
-### 5. Definitions & Interpretation Conflicts
-### 6. Practical Reading Guide
-
-For every statute cited include: Cap. number or year of enactment, and the \
-relevant section numbers.
-
-## Cross-Reference Map:"""
+## Analysis:"""
 
 # ─── Plain Language / Access to Justice Templates ─────────────────────────────
 
@@ -685,46 +480,22 @@ PLAIN_LANGUAGE_TEMPLATE = """\
 
 ---
 
-## Question (Plain Language Mode — Article 48 CoK):
+## User's Situation:
 {query}
 
-## Plain-Language Legal Explanation:
+Explain the law and what they should do next like you are talking to someone 
+who has never spoken to a lawyer before. Focus entirely on the practical reality 
+and the specific steps they need to take. Do not use legal jargon.
 
-Write for a self-represented litigant with no legal training. You MUST:
-1. **Never use unexplained legal jargon.** If a legal term is unavoidable, \
-   immediately explain it in simple English in brackets.
-2. Use short sentences and simple words.
-3. Structure the answer as a story: "Here is what the law says → Here is what \
-   this means for you → Here is what you can do."
-4. Use numbered lists and bullet points for steps.
-5. Include specific practical steps (which court, what forms, what fees, \
-   time limits) drawn from [Source N].
-6. End with a section: **When You Should See a Lawyer** — describe situations \
-   where professional help is essential and list where to get it for free:
-   - Kituo Cha Sheria: 0722 314 508
-   - FIDA Kenya: 0720 904 065
-   - LSK Pro Bono Programme: 0703 874 481
-
-Cite sources as [Source N] where helpful, but do not let citations interrupt \
-readability.
-
-## Plain-Language Explanation:"""
+## Explanation:"""
 
 DIRECT_PLAIN_LANGUAGE_TEMPLATE = """\
-## Question (Plain Language Mode — Article 48 CoK):
+## User's Situation:
 {query}
 
-## Plain-Language Legal Explanation:
-
-Write for a self-represented litigant with no legal training:
-- **What the law says** (quote the relevant provision simply)
-- **What this means for you** (practical real-world impact)
-- **What you can do** (numbered step-by-step guide)
-- **Time limits you must know**
-- **Costs and fees involved**
-- **When you must see a lawyer** (and free legal aid contacts)
-
-Never use unexplained jargon. Short sentences. Simple words.
+Explain the law and what they should do next like you are talking to someone 
+who has never spoken to a lawyer before. Focus entirely on the practical reality 
+and the specific steps they need to take. Do not use legal jargon.
 
 ## Explanation:"""
 
@@ -736,38 +507,22 @@ SWAHILI_TEMPLATE = """\
 
 ---
 
-## Swali (Kiswahili):
+## Swahili Query:
 {query}
 
-## Maelekezo ya Jibu:
-Jibu katika Kiswahili sanifu. Ufafanuzi lazima:
-1. Taja sheria au Katiba inayohusika ([Chanzo N]) — nunuu maandishi halisi.
-2. Eleza jinsi mahakama zimetekeleza sheria hiyo.
-3. Toa maelezo ya vitendo (hatua za kufuata, muda wa kisheria, gharama).
-4. Tumia lugha rahisi inayoeleweka kwa mtu ambaye si mwanasheria.
-5. Mwishowe: **Unapaswa Kuona Mwanasheria Wakati** — na nambari za msaada wa kisheria \
-   bila malipo:
-   - Kituo Cha Sheria: 0722 314 508
-   - FIDA Kenya: 0720 904 065
-   - LSK: 0703 874 481
-
-Rejelea vyanzo kwa [Chanzo N].
+Jibu swali hili kwa Kiswahili sanifu na kinachoeleweka kwa urahisi. 
+Tumia vyanzo vilivyoambatanishwa kujenga hoja ya kisheria.
+Kama unatumia maneno ya kisheria ya Kiingereza, yawekee maelezo kwa Kiswahili.
 
 ## Jibu:"""
 
 DIRECT_SWAHILI_TEMPLATE = """\
-## Swali (Kiswahili):
+## Swahili Query:
 {query}
 
-## Maelekezo ya Jibu:
-Jibu katika Kiswahili sanifu:
-1. Sheria inayohusika (taja sehemu au Ibara halisi)
-2. Jinsi mahakama zimetekeleza sheria hiyo
-3. Hatua za vitendo (nini ufanye, muda gani, wapi uende)
-4. Gharama na ada za mahakama
-5. Unapaswa Kuona Mwanasheria Wakati
-
-Tumia lugha rahisi. Epuka maneno magumu ya kisheria bila maelezo.
+Jibu swali hili kwa Kiswahili sanifu na kinachoeleweka kwa urahisi. 
+Jenga hoja ya kisheria kulingana na sheria za Kenya.
+Kama unatumia maneno ya kisheria ya Kiingereza, yawekee maelezo kwa Kiswahili.
 
 ## Jibu:"""
 
@@ -858,6 +613,79 @@ class LegalGenerator:
             self._rag_error = str(e)
             logger.warning(f"RAG unavailable at startup (will retry per-request): {e}")
 
+    def _build_user_context_profile(self, query: str, prior_context: Optional[str] = None) -> dict:
+        """
+        Build a profile of who this user is and what they care about.
+        This shapes how we construct arguments throughout the response.
+        """
+        profile: dict = {}
+
+        # Infer user type from query language
+        if any(w in query.lower() for w in ["my company", "business", "enterprise", "ltd", "limited"]):
+            profile["user_type"] = "business"
+        elif any(w in query.lower() for w in ["petition", "plead", "file", "court order", "locus standi", "ultra vires"]):
+            profile["user_type"] = "practitioner"
+        else:
+            profile["user_type"] = "individual"
+
+        # Infer legal knowledge from terminology used
+        advanced_terms = ["locus standi", "ultra vires", "mens rea", "pro bono", "certiorari", "mandamus"]
+        if sum(1 for t in advanced_terms if t in query.lower()) >= 2:
+            profile["legal_knowledge"] = "advanced"
+        elif any(t in query.lower() for t in ["article", "section", "act", "statute", "provision"]):
+            profile["legal_knowledge"] = "basic"
+        else:
+            profile["legal_knowledge"] = "none"
+
+        # Infer urgency
+        urgent_words = ["urgent", "asap", "immediately", "deadline", "court date", "tomorrow", "today"]
+        profile["urgency"] = "high" if any(w in query.lower() for w in urgent_words) else "medium"
+
+        profile["situation_summary"] = query[:200]
+        profile["prior_context"] = prior_context or ""
+
+        # Extract constraints
+        constraints = []
+        if "budget" in query.lower() or "afford" in query.lower() or "cheap" in query.lower():
+            constraints.append("cost-sensitive")
+        if "time" in query.lower() or profile["urgency"] == "high":
+            constraints.append("time-sensitive")
+        if "confidential" in query.lower() or "private" in query.lower():
+            constraints.append("confidentiality-required")
+        profile["key_constraints"] = constraints
+
+        return profile
+
+    def _score_source_for_context(self, source: dict, user_profile: Optional[dict] = None) -> float:
+        """
+        Dynamically re-weights sources based on the user's profile and current context.
+        """
+        base_score = source.get("score", 0.0)
+        authority = source.get("hierarchy_weight", 0.0)
+        
+        # Start with standard RAG score and bump by authority
+        weight = base_score + (authority * 0.2)
+        
+        if not user_profile:
+            return weight
+
+        # If urgent, prioritize direct statutes over long cases
+        if user_profile.get("urgency") == "high":
+            if source.get("document_type") in ["constitution", "act"]:
+                weight += 0.15
+        
+        # If practitioner, prioritize Supreme Court and Court of Appeal cases
+        if user_profile.get("user_type") == "practitioner":
+            if authority >= 0.8:  # SC and CoA
+                weight += 0.1
+                
+        # If plain language, slightly prefer Constitutions and Acts over dense cases
+        if user_profile.get("legal_knowledge") == "none":
+            if source.get("document_type") in ["constitution", "act", "legal_notice"]:
+                weight += 0.1
+
+        return weight
+
     # ── RAG Templates ──────────────────────────────────────────────────────────
 
     _RAG_TEMPLATES = {
@@ -897,6 +725,7 @@ class LegalGenerator:
         document_type: Optional[str] = None,
         court: Optional[str] = None,
         history: Optional[list[dict]] = None,
+        prior_context: Optional[str] = None,
         temperature: Optional[float] = None,
         max_tokens: int = 4096,
     ) -> dict:
@@ -909,40 +738,44 @@ class LegalGenerator:
             document_type: Optional filter (constitution, act, judgment, legal_notice)
             court: Optional court filter
             history: List of {role, content} dicts representing prior turns.
-                     Injected before the current message so the LLM can do
-                     multi-turn follow-ups.
+            prior_context: User's prior statements/context — shapes entire response.
             temperature: LLM temperature (lower = more factual)
             max_tokens: Maximum generation length
         """
         history = history or []
-        
-        # 1. Conversational greeting check & warm bypass
+
+        # Build user context profile first — informs every subsequent step
+        user_profile = self._build_user_context_profile(query, prior_context)
+
+        # Conversational greeting bypass (pure greetings only)
         if self._is_greeting(query):
-            logger.info(f"Conversational greeting detected: '{query}'. Bypassing RAG and research mode.")
+            logger.info(f"Pure greeting detected: '{query}'. Bypassing RAG.")
             return self._generate_greeting_response(query, mode)
-        
-        # Determine temperature dynamically based on mode if not provided
+
+        # Determine temperature from mode if not explicitly provided
         if temperature is None:
             settings = get_settings()
-            if mode == "drafting" or mode == "petition_drafting":
+            if mode in ("drafting", "petition_drafting"):
                 temperature = getattr(settings, "drafting_temperature", 0.2)
             else:
                 temperature = getattr(settings, "llm_temperature", 0.4)
 
-        # Lazy RAG init — retry if startup probe failed (e.g. cold-start timeout)
+        # Lazy RAG init — retry on every request if startup probe failed
         if not self._rag_available:
             self._try_init_rag()
 
         if self._rag_available:
             return self._generate_rag(
                 query, mode, document_type, court,
-                history, temperature, max_tokens
+                history, temperature, max_tokens,
+                user_profile=user_profile,
             )
         else:
             logger.warning(f"RAG not available, using direct mode. Last error: {self._rag_error}")
             return self._generate_direct(
                 query, mode, history, temperature, max_tokens,
-                rag_error=self._rag_error
+                user_profile=user_profile,
+                rag_error=self._rag_error,
             )
 
     def ask(self, query: str, **kwargs) -> dict:
@@ -962,19 +795,25 @@ class LegalGenerator:
         return self.generate(query, mode="deep_research", **kwargs)
 
     def _is_greeting(self, query: str) -> bool:
-        """Detect if the query is a simple conversational greeting or generic intro."""
+        """
+        Detect if this is JUST a greeting (not a greeting + question).
+        Only pure greetings bypass RAG/research mode.
+        """
         q = query.strip().lower().strip("?!.,-")
-        greetings = {
-            "hello", "hi", "hey", "jambo", "habari", "mambo", "sasa", "hello there", "hi there",
-            "good morning", "good afternoon", "good evening", "greetings", "yo", "sup", "howdy",
-            "test", "testing"
+        pure_greetings = {
+            "hello", "hi", "hey", "jambo", "habari", "mambo", "sasa",
+            "good morning", "good afternoon", "good evening",
+            "greetings", "yo", "sup", "howdy", "test", "testing",
+            "hello there", "hi there"
         }
-        # Check if the query is a single word or short phrase that matches common greetings
-        if q in greetings:
+        if q in pure_greetings:
             return True
-        # Also check if it starts with a greeting followed by simple words (e.g., "hello assistant")
+        # Do NOT treat "hello, what about X" as a greeting
+        if "," in query or any(w in q for w in ["what", "how", "explain", "tell me", "ask", "can", "does", "is ", "are "]):
+            return False
+        # Short phrase starting with a greeting word (e.g. "hello assistant")
         words = q.split()
-        if len(words) <= 3 and words[0] in greetings:
+        if len(words) <= 2 and words[0] in pure_greetings:
             return True
         return False
 
@@ -1120,10 +959,10 @@ class LegalGenerator:
 
     def _generate_rag(
         self, query, mode, document_type, court,
-        history, temperature, max_tokens
+        history, temperature, max_tokens,
+        user_profile: Optional[dict] = None,
     ) -> dict:
         """Generate a response grounded in retrieved source documents."""
-        # Retrieve relevant context and sources in one call
         try:
             raw_results = self.retrieval.retrieve(
                 query=query,
@@ -1132,19 +971,27 @@ class LegalGenerator:
             )
         except Exception as e:
             logger.error(f"RAG retrieval failed: {e}")
-            return self._generate_direct(query, mode, history, temperature, max_tokens, rag_error=f"Retrieval failed: {e}")
+            return self._generate_direct(query, mode, history, temperature, max_tokens,
+                                         user_profile=user_profile, rag_error=f"Retrieval failed: {e}")
 
         if not raw_results:
-            # No relevant documents found — fall back to direct mode
             logger.info("No RAG context found — falling back to direct mode")
-            return self._generate_direct(query, mode, history, temperature, max_tokens, rag_error="No matching documents found in vector database")
+            return self._generate_direct(query, mode, history, temperature, max_tokens,
+                                         user_profile=user_profile,
+                                         rag_error="No matching documents found in vector database")
 
-        # Build context from results
+        # Sort results by relevance AND authority (not just retrieval order)
+        weighted_results = [
+            (result, self._score_source_for_context(result, user_profile))
+            for result in raw_results
+        ]
+        weighted_results.sort(key=lambda x: x[1], reverse=True)
+
         context_parts = []
         total_length = 0
-        max_context_length = 12000
+        max_context_length = 14000
 
-        for i, result in enumerate(raw_results, 1):
+        for i, (result, weight) in enumerate(weighted_results, 1):
             source_info = []
             if result.get("document_title"):
                 source_info.append(result["document_title"])
@@ -1159,26 +1006,28 @@ class LegalGenerator:
 
             authority = result.get("hierarchy_weight", 0)
             authority_label = self.retrieval._authority_label(authority)
-
             source_label = " | ".join(source_info) if source_info else "Unknown Source"
 
             chunk = (
-                f"[Source {i}: {source_label} | Authority: {authority_label}]\n"
+                f"[Source {i}: {source_label} | Authority: {authority_label} | Relevance: {weight:.2f}]\n"
                 f"{result['text']}\n"
             )
 
             if total_length + len(chunk) > max_context_length:
+                logger.info(f"Context limit reached after {i-1} sources")
                 break
 
             context_parts.append(chunk)
             total_length += len(chunk)
 
         context = "\n---\n".join(context_parts)
+        if len(context_parts) < 3:
+            context += "\n\n[NOTE: Limited sources retrieved. Response grounded in these sources plus expert legal knowledge.]"
 
         template = self._RAG_TEMPLATES.get(mode, QUERY_TEMPLATE)
         user_prompt = template.format(context=context, query=query)
 
-        messages = self._build_messages(RAG_SYSTEM_PROMPT, history, user_prompt, mode)
+        messages = self._build_messages(RAG_SYSTEM_PROMPT, history, user_prompt, mode, user_profile=user_profile)
 
         try:
             completion, used_model = self._create_chat_completion(
@@ -1189,8 +1038,8 @@ class LegalGenerator:
 
             response_text = completion.choices[0].message.content
 
-            # Quality check and enhancement for depth modes
-            if mode in ["research_deep", "deep_research"]:
+            # Argument-validation quality check for deep modes
+            if mode in ["research_deep", "deep_research", "case_analysis"]:
                 is_adequate, feedback = self._check_response_quality(response_text, mode)
                 if not is_adequate:
                     logger.info(f"Enhancing response quality: {feedback}")
@@ -1198,10 +1047,8 @@ class LegalGenerator:
                         response_text, feedback, query, mode, temperature
                     )
 
-            # Parse follow-up questions from response
             main_response, follow_up_questions = self._parse_follow_ups(response_text)
 
-            # Extract source metadata for the frontend
             sources = [
                 {
                     "title": r.get("document_title", ""),
@@ -1221,6 +1068,11 @@ class LegalGenerator:
                 "model": used_model,
                 "rag_used": True,
                 "follow_up_questions": follow_up_questions,
+                "user_profile": {
+                    "type": user_profile.get("user_type") if user_profile else None,
+                    "legal_knowledge": user_profile.get("legal_knowledge") if user_profile else None,
+                    "urgency": user_profile.get("urgency") if user_profile else None,
+                },
                 "tokens_used": {
                     "prompt": completion.usage.prompt_tokens,
                     "completion": completion.usage.completion_tokens,
@@ -1229,16 +1081,18 @@ class LegalGenerator:
             }
         except Exception as e:
             logger.error(f"RAG generation failed: {e}")
-            return self._generate_direct(query, mode, history, temperature, max_tokens, rag_error=f"Generation failed: {e}")
+            return self._generate_direct(query, mode, history, temperature, max_tokens,
+                                         user_profile=user_profile, rag_error=f"Generation failed: {e}")
 
     # ── Internal: Direct Generation ────────────────────────────────────────────
 
-    def _generate_direct(self, query, mode, history, temperature, max_tokens, rag_error=None) -> dict:
+    def _generate_direct(self, query, mode, history, temperature, max_tokens,
+                         user_profile: Optional[dict] = None, rag_error=None) -> dict:
         """Generate a response using direct LLM knowledge (no RAG)."""
         template = self._DIRECT_TEMPLATES.get(mode, DIRECT_QUERY_TEMPLATE)
         user_prompt = template.format(query=query)
 
-        messages = self._build_messages(SYSTEM_PROMPT, history, user_prompt, mode)
+        messages = self._build_messages(SYSTEM_PROMPT, history, user_prompt, mode, user_profile=user_profile)
 
         try:
             completion, used_model = self._create_chat_completion(
@@ -1249,8 +1103,8 @@ class LegalGenerator:
 
             response_text = completion.choices[0].message.content
 
-            # Quality check and enhancement for depth modes
-            if mode in ["research_deep", "deep_research"]:
+            # Argument-validation quality check for deep modes
+            if mode in ["research_deep", "deep_research", "case_analysis"]:
                 is_adequate, feedback = self._check_response_quality(response_text, mode)
                 if not is_adequate:
                     logger.info(f"Enhancing response quality: {feedback}")
@@ -1258,7 +1112,6 @@ class LegalGenerator:
                         response_text, feedback, query, mode, temperature
                     )
 
-            # Parse follow-up questions from response
             main_response, follow_up_questions = self._parse_follow_ups(response_text)
 
             return {
@@ -1269,6 +1122,11 @@ class LegalGenerator:
                 "rag_used": False,
                 "follow_up_questions": follow_up_questions,
                 "rag_error": rag_error,
+                "user_profile": {
+                    "type": user_profile.get("user_type") if user_profile else None,
+                    "legal_knowledge": user_profile.get("legal_knowledge") if user_profile else None,
+                    "urgency": user_profile.get("urgency") if user_profile else None,
+                },
                 "tokens_used": {
                     "prompt": completion.usage.prompt_tokens,
                     "completion": completion.usage.completion_tokens,
@@ -1310,33 +1168,53 @@ class LegalGenerator:
 
     def _check_response_quality(self, response_text: str, mode: str) -> tuple[bool, str]:
         """
-        Check if the response meets minimum quality standards for legal depth.
-        Returns (is_adequate, feedback_message).
+        Check if the response contains VALID LEGAL REASONING, not just structure.
+        Returns (is_adequate, feedback).
         """
         issues = []
-        
-        # Check for citations/cases (at least 1)
-        citation_indicators = ["v.", "Petition", "Civil Case", "Criminal Case", "Article", "Section"]
-        has_citation = any(indicator in response_text for indicator in citation_indicators)
-        if not has_citation:
-            issues.append("missing legal citations or case references")
-        
-        # Check for critique (at least 1 opinionated statement)
-        critique_indicators = ["poorly drafted", "weak reasoning", "inconsistent", "problematic", "critically", "however", "but"]
-        has_critique = any(indicator in response_text for indicator in critique_indicators)
-        if not has_critique:
-            issues.append("missing critical analysis or opinionated critique")
-        
-        # Check for practical advice (at least 1)
-        practical_indicators = ["in practice", "practitioners", "clients should", "common pitfalls", "strategic", "next steps"]
-        has_practical = any(indicator in response_text for indicator in practical_indicators)
-        if not has_practical:
-            issues.append("missing practical advice or real-world implications")
-        
+
+        # 1. Does it acknowledge complexity where appropriate?
+        if mode in ["research_deep", "deep_research", "case_analysis"]:
+            complexity_markers = ["however", "but", "tension", "conflict", "unclear",
+                                  "courts split", "unsettled", "one interpretation"]
+            if not any(m in response_text.lower() for m in complexity_markers):
+                issues.append("doesn't acknowledge genuine complexity in the law")
+
+        # 2. Does it distinguish settled law from contested areas?
+        settled = ["clearly established", "no doubt", "well-settled", "uncontroversial"]
+        contested = ["debated", "disputed", "unclear", "split", "disagreement"]
+        has_distinctions = (
+            any(m in response_text.lower() for m in settled) or
+            any(m in response_text.lower() for m in contested)
+        )
+        if not has_distinctions and mode in ["research", "deep_research"]:
+            issues.append("treats all legal positions equally; doesn't distinguish settled from contested")
+
+        # 3. Does it show reasoning rather than bare conclusions?
+        reasoning_markers = ["because", "therefore", "this means", "the significance",
+                             "here's why", "what this means"]
+        if not any(m in response_text.lower() for m in reasoning_markers):
+            issues.append("lacks visible reasoning; feels like conclusions without support")
+
+        # 4. Does it acknowledge uncertainty where nuance is warranted?
+        uncertainty = ["uncertain", "not clear", "unclear", "may", "might", "depends on", "could argue"]
+        if mode in ["case_analysis", "drafting"] and len(response_text) > 500:
+            if not any(m in response_text.lower() for m in uncertainty):
+                issues.append("presents everything as certain when nuance is appropriate")
+
+        # 5. Drafting mode must flag customization points
+        if mode in ["drafting", "petition_drafting"] and "[CUSTOMISE:" not in response_text:
+            issues.append("doesn't flag customization points for the drafter")
+
+        # 6. Plain language mode must avoid legalese
+        if mode == "plain_language":
+            legalese = ["pursuant to", "heretofore", "notwithstanding", "inter alia",
+                        "prima facie", "ceteris paribus"]
+            if any(t in response_text for t in legalese):
+                issues.append("uses legal jargon in plain language mode")
+
         if issues:
-            feedback = f"Response lacks depth: {', '.join(issues)}. Please enhance with specific legal citations, critical analysis, and practical guidance."
-            return False, feedback
-        
+            return False, " | ".join(issues)
         return True, ""
 
     def _enhance_response_quality(self, response_text: str, feedback: str, query: str, mode: str, temperature: float) -> str:
@@ -1399,27 +1277,47 @@ Enhanced response:"""
         system_prompt: str,
         history: list[dict],
         current_user_prompt: str,
-        mode: str = "research"
+        mode: str = "research",
+        user_profile: Optional[dict] = None,
     ) -> list[dict]:
         """
         Build the full messages array for the LLM call.
-
-        Structure:
-          [system] → [history turns…] → [current user turn]
+        Injects user context profile to shape reasoning style.
         """
-        # Weave together the advanced system prompt
         full_system_prompt = system_prompt
         full_system_prompt += "\n\n" + USER_CONTEXT_PROMPT
         full_system_prompt += "\n\n" + CRITICAL_ANALYSIS_PROMPT
-        
+
+        # Inject user-specific guidance when a profile is available
+        if user_profile:
+            constraints_str = (
+                ", ".join(user_profile["key_constraints"])
+                if user_profile["key_constraints"] else "none identified"
+            )
+            prior = user_profile.get("prior_context", "")[:300] or "none"
+            user_guidance = f"""
+## ABOUT THIS USER:
+- Type: {user_profile['user_type']}
+- Legal Knowledge: {user_profile['legal_knowledge']}
+- Urgency: {user_profile['urgency']}
+- Key Constraints: {constraints_str}
+Prior Context: {prior}
+
+## GUIDANCE:
+- No legal knowledge → explain simply; replace Latin with plain English.
+- Practitioner → skip basics, use technical language.
+- Time-sensitive → lead with the CRITICAL ACTION they should take NOW.
+- Cost-conscious → flag expensive vs. cheaper alternatives.
+Make every sentence relevant to THEIR specific situation."""
+            full_system_prompt += user_guidance
+
         if mode in STYLE_BY_MODE:
             full_system_prompt += "\n\n" + STYLE_BY_MODE[mode]
-            
+
         full_system_prompt += "\n\n" + NEGATIVE_INSTRUCTIONS
-        
+
         messages: list[dict] = [{"role": "system", "content": full_system_prompt}]
 
-        # Inject prior conversation turns (capped to last 10 to control token use)
         for turn in history[-10:]:
             role = turn.get("role", "user")
             content = turn.get("content", "")
