@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field
 
 from contextlib import asynccontextmanager
 from src.config.settings import get_settings
-from src.generation.legal_generator import LegalGenerator
+from src.generation.legal_generator import SubstantiveLegalGenerator
 from src.embedding.embedding_service import EmbeddingService
 from src.tools.disclaimer_engine import assess_disclaimer
 from src.tools.limitation_checker import check_limitation
@@ -27,7 +27,7 @@ settings = get_settings()
 
 # Global service instances (initialized in lifespan)
 embedding_service: Optional[EmbeddingService] = None
-legal_generator: Optional[LegalGenerator] = None
+legal_generator: Optional[SubstantiveLegalGenerator] = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -42,8 +42,8 @@ async def lifespan(app: FastAPI):
         embedding_service = None
 
     try:
-        legal_generator = LegalGenerator()
-        logger.info("LegalGenerator initialized")
+        legal_generator = SubstantiveLegalGenerator()
+        logger.info("SubstantiveLegalGenerator initialized")
     except Exception as e:
         logger.error(f"Failed to initialize LegalGenerator: {e}")
         legal_generator = None
@@ -235,8 +235,8 @@ async def health_check():
     rag_available = False
     rag_error = None
     if legal_generator is not None:
-        rag_available = legal_generator._rag_available
-        rag_error = legal_generator._rag_error
+        rag_available = getattr(legal_generator, "_rag_available", False)
+        rag_error = getattr(legal_generator, "_rag_error", None)
 
     # --- API key presence checks (never expose full key) ---
     def key_status(k):

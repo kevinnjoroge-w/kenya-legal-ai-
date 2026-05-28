@@ -4,6 +4,8 @@ Kenya Legal AI — Document Processor
 Handles cleaning, chunking, and preparing legal documents for embedding.
 Uses legal-aware splitting strategies that respect document structure
 (sections, articles, paragraphs) rather than naive character splitting.
+
+Supports multiple document formats: PDF, DOCX, HTML, XML, TXT
 """
 
 import json
@@ -12,10 +14,11 @@ import re
 import hashlib
 from dataclasses import dataclass, asdict, field
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional, List, Union
 import fitz # PyMuPDF
 
 from src.config.settings import get_settings
+from src.ingestion.document_handler import extract_text_from_file
 
 logger = logging.getLogger(__name__)
 
@@ -423,6 +426,55 @@ class LegalDocumentProcessor:
             source="cipit",
             metadata={"title": title, "filename": filepath.name},
         )
+
+    def process_multi_format_document(
+        self,
+        file_path: Path,
+        document_type: str = "legal_notice",
+        source: str = "generic",
+        metadata: Optional[dict] = None
+    ) -> list[DocumentChunk]:
+        """
+        Process a document in any supported format (PDF, DOCX, HTML, XML, TXT).
+
+        Uses the unified DocumentHandler to extract text from various formats.
+
+        Args:
+            file_path: Path to the document file
+            document_type: Type of document (judgment, act, legal_notice, etc)
+            source: Data source name (kenya_law, judiciary, etc)
+            metadata: Additional metadata dict
+
+        Returns:
+            List of DocumentChunk objects
+        """
+        if not file_path.exists():
+            logger.warning(f"File not found: {file_path}")
+            return []
+
+        # Extract text using unified document handler
+        text = extract_text_from_file(file_path)
+        if not text:
+            logger.warning(f"Failed to extract text from {file_path}")
+            return []
+
+        # Generate document ID and title
+        doc_id = self._generate_document_id(source, file_path.stem)
+        title = metadata.get("title", "") if metadata else ""
+        if not title:
+            title = file_path.stem.replace("_", " ").replace("-", " ")
+
+        # Chunk the document
+        chunks = self.chunk_document(
+            text=text,
+            document_id=doc_id,
+            document_title=title,
+            document_type=document_type,
+            source=source,
+            metadata=metadata or {"filename": file_path.name},
+        )
+
+        return chunks
 
 
 def process_all_documents(output_filename: str = "all_documents"):
