@@ -7,7 +7,7 @@ legal research chat, case search, document analysis, and system status.
 
 import logging
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -137,7 +137,7 @@ class ChatResponse(BaseModel):
     mode: str = "research"
     model: str = ""
     rag_used: bool = False
-    tokens_used: Optional[dict] = None
+    tokens_used: Optional[int | dict[str, Any]] = None
     follow_up_questions: list[str] = Field(
         default=[],
         description="Suggested follow-up questions to deepen the research",

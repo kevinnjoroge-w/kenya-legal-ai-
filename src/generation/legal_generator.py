@@ -91,13 +91,13 @@ EVERY response must contain:
 - **Plain Language**: 600–1000 words. Simple words, but substantive content.
 - **Petition**: 1500–2500 words. Compelling fact narrative + solid legal argument.
 
-Each paragraph should contain AT LEAST ONE specific case citation or statutory reference.
+Each paragraph should contain AT LEAST TEN specific case citation or statutory reference.
 No paragraphs longer than 150 words (readability).
 No generic statements like "this is an important area of law" without immediately explaining WHY.
 
 ## CITATION DENSITY:
 
-Minimum citation ratio: 1 specific case/statute reference per 100 words.
+Minimum citation ratio: 3 specific case/statute reference per 100 words.
 Cases cited must be named properly (not "a High Court decision") with year and court.
 Distinguish between ratio (binding) and obiter (persuasive).
 
@@ -177,7 +177,7 @@ This is not a summary. It is a reasoned legal opinion.
 
 Before writing, explicitly think through:
 1. What is the PRECISE legal question (often different from what's literally asked)?
-2. What precedent chain controls this? (Minimum 2–3 cases per major point)
+2. What precedent chain controls this? (Minimum 2–4 cases per major point)
 3. Is the law settled, or are courts split? If split, which line is winning?
 4. What is the strongest counterargument, and how do you overcome it?
 5. What practical pitfall should they know about?
@@ -335,7 +335,7 @@ Do NOT use rigid structure. Build your argument methodically:
 
 ## Minimum Standards:
 - Minimum 2000 words
-- Precedent chain analyzed (minimum 4–6 key cases)
+- Precedent chain analyzed (minimum 8–10 key cases)
 - At least 2 competing interpretations discussed
 - At least 1 strong critical opinion on weakness in existing law
 - Comparative note to other jurisdictions
@@ -444,6 +444,50 @@ you seek. Don't just assert "this violates Article X." Explain how, using preced
 - Emotional resonance (not dry legal writing)
 
 ## Draft:"""
+
+ADAPTIVE_QUERY_TEMPLATE = """\
+## Retrieved Legal Sources:
+{context}
+
+---
+
+## User Question:
+{query}
+
+## Response Guidance:
+You are a senior Kenyan advocate and legal research advisor. Respond to the user's need rather than enforcing a rigid structure.
+Response intent: {intent}
+Mode hint: {mode}
+
+If the user needs an explanation, answer clearly and directly.
+If the user needs legal analysis, compare the strongest arguments, note uncertainty, and explain the practical consequences.
+If the user needs procedural guidance, describe the practical steps, likely pitfalls, and the safest route.
+If the user needs drafting help, generate a complete, usable legal draft in formal format, including headings, numbered paragraphs, and wording suitable for filing or review. Do not only provide outlines or drafting notes.
+If the user needs plain language, simplify the answer and avoid jargon.
+If the mode is swahili, answer in Swahili.
+
+Use retrieved sources as evidence where available. If the evidence is insufficient, say the answer is based on general Kenyan legal knowledge and identify the limits.
+Keep the answer focused on solving the user's legal need. Avoid filler, checklists, or word-count padding.
+"""
+
+ADAPTIVE_DIRECT_TEMPLATE = """\
+## User Question:
+{query}
+
+## Response Guidance:
+You are a senior Kenyan advocate and legal research advisor. Respond to the user's need rather than enforcing a rigid structure.
+Response intent: {intent}
+Mode hint: {mode}
+
+If the user needs an explanation, answer clearly and directly.
+If the user needs legal analysis, compare the strongest arguments, note uncertainty, and explain the practical consequences.
+If the user needs procedural guidance, describe the practical steps, likely pitfalls, and the safest route.
+If the user needs drafting help, generate a complete, usable legal draft in formal format, including headings, numbered paragraphs, and wording suitable for filing or review. Do not only provide outlines or drafting notes.
+If the user needs plain language, simplify the answer and avoid jargon.
+If the mode is swahili, answer in Swahili.
+
+Use Kenyan legal principles and any relevant evidence you can infer. Keep the answer focused on solving the user's need.
+"""
 
 # ─── SUBSTANTIVE QUALITY VALIDATION ────────────────────────────────────────────
 
@@ -658,19 +702,43 @@ class SubstantiveLegalGenerator:
 
         return response
 
+    def _infer_intent(self, query: str, mode: str) -> str:
+        normalized = (query or "").lower()
+        if mode == "swahili":
+            return "swahili"
+        if mode in ["drafting", "petition_drafting"]:
+            return "drafting"
+        if mode == "plain_language":
+            return "plain_language"
+        if re.search(r"\b(draft|petition|affidavit|contract|letter|memorandum|terms|clause)\b", normalized):
+            return "drafting"
+        if re.search(r"\b(how do i|what steps|procedure|process|file|serve|appeal|apply|challenge|prepare)\b", normalized):
+            return "procedural guidance"
+        if re.search(r"\b(compare|difference|versus|vs|contrast|rather than)\b", normalized):
+            return "analysis"
+        if re.search(r"\b(what does|meaning of|explain|summary|interpretation|define)\b", normalized):
+            return "explanation"
+        return "analysis"
+
     def _generate_internal(self, query, mode, temperature, max_tokens, history, **kwargs) -> dict:
         """Internal generation logic."""
-        # Build system prompt based on RAG availability
+        intent = self._infer_intent(query, mode)
+
         if self._rag_available:
             system_prompt = RAG_SUBSTANTIVE_SYSTEM_PROMPT
-            template = self._get_rag_template(mode)
+            template = self._get_rag_template(mode, query)
             context = self._retrieve_context(query, **kwargs)
-            user_prompt = template.format(context=context or "[No specific sources retrieved]", query=query)
+            user_prompt = template.format(
+                context=context or "[No specific sources retrieved]",
+                query=query,
+                intent=intent,
+                mode=mode,
+            )
             rag_used = True
         else:
             system_prompt = SUBSTANTIVE_SYSTEM_PROMPT
-            template = self._get_direct_template(mode)
-            user_prompt = template.format(query=query)
+            template = self._get_direct_template(mode, query)
+            user_prompt = template.format(query=query, intent=intent, mode=mode)
             rag_used = False
 
         messages = [
@@ -706,28 +774,26 @@ class SubstantiveLegalGenerator:
     def _generate_with_retry(self, query, mode, feedback, temperature, max_tokens, history, **kwargs) -> dict:
         """Retry generation with explicit instruction to fix validation failures."""
         system_prompt = SUBSTANTIVE_SYSTEM_PROMPT
-        template = self._get_direct_template(mode)
+        template = self._get_direct_template(mode, query)
+        intent = self._infer_intent(query, mode)
 
         # Build stricter user prompt
-        user_prompt = template.format(query=query)
+        user_prompt = template.format(query=query, intent=intent, mode=mode)
         user_prompt += f"""
 
 ## IMPORTANT: Validation Feedback from Previous Attempt
 
-Your previous response was assessed as INSUFFICIENTLY SUBSTANTIVE.
+Your previous response was assessed as insufficiently substantive.
 
 Specific issues:
 {feedback}
 
-Please provide a revised, MUCH MORE DETAILED response that addresses these specific gaps:
-- Add more precedent chain analysis (trace cases over time, show how reasoning evolved)
-- Include critical analysis: flag weak reasoning or poorly drafted laws
-- Add practical examples showing how the law actually works
-- Acknowledge areas of legal uncertainty or competing interpretations
-- End with specific action the user should take
-- Ensure EVERY paragraph contains a case/statute reference
-
-This is your opportunity to provide the comprehensive, usable analysis a lawyer would expect.
+Please provide a revised answer that is more useful for the user's request.
+- Be more helpful and focused on the user's legal need.
+- Use evidence where available and say when you rely on general Kenyan legal knowledge.
+- If the user asked for analysis, compare arguments and explain uncertainty.
+- If the user asked for drafting, provide a full completed draft with formal wording suitable for filing, not just structure or notes.
+- If the user asked for procedural guidance, provide clear steps and likely pitfalls.
 """
 
         messages = [
@@ -784,28 +850,17 @@ This is your opportunity to provide the comprehensive, usable analysis a lawyer 
             logger.warning(f"Context retrieval failed: {e}")
             return ""
 
-    def _get_rag_template(self, mode: str) -> str:
+    def _get_rag_template(self, mode: str, query: Optional[str] = None) -> str:
         """Get RAG-mode template."""
-        templates = {
-            "research": SUBSTANTIVE_QUERY_TEMPLATE,
-            "case_analysis": SUBSTANTIVE_CASE_ANALYSIS_TEMPLATE,
-            "drafting": SUBSTANTIVE_DRAFTING_TEMPLATE,
-            "deep_research": SUBSTANTIVE_DEEP_RESEARCH_TEMPLATE,
-            "petition_drafting": SUBSTANTIVE_PETITION_DRAFTING_TEMPLATE,
-        }
-        return templates.get(mode, SUBSTANTIVE_QUERY_TEMPLATE)
+        if mode == "drafting" and query and re.search(r'\baffidavit\b', query, re.IGNORECASE):
+            return AFFIDAVIT_DRAFT_TEMPLATE
+        return ADAPTIVE_QUERY_TEMPLATE
 
-    def _get_direct_template(self, mode: str) -> str:
+    def _get_direct_template(self, mode: str, query: Optional[str] = None) -> str:
         """Get direct-mode template (no RAG)."""
-        # Same templates but remove the "## Retrieved Legal Sources:" section
-        templates = {
-            "research": SUBSTANTIVE_QUERY_TEMPLATE.replace("## Retrieved Legal Sources:\n{context}\n\n---\n\n", ""),
-            "case_analysis": SUBSTANTIVE_CASE_ANALYSIS_TEMPLATE,
-            "drafting": SUBSTANTIVE_DRAFTING_TEMPLATE.replace("## Relevant Legal Sources:\n{context}\n\n---\n\n", ""),
-            "deep_research": SUBSTANTIVE_DEEP_RESEARCH_TEMPLATE,
-            "petition_drafting": SUBSTANTIVE_PETITION_DRAFTING_TEMPLATE.replace("## Retrieved Legal Sources:\n{context}\n\n---\n\n", ""),
-        }
-        return templates.get(mode, SUBSTANTIVE_QUERY_TEMPLATE)
+        if mode == "drafting" and query and re.search(r'\baffidavit\b', query, re.IGNORECASE):
+            return AFFIDAVIT_DRAFT_TEMPLATE
+        return ADAPTIVE_DIRECT_TEMPLATE
 
     # ── Convenience Shortcuts ──────────────────────────────────────────────────
 

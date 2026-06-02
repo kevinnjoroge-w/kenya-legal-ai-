@@ -148,7 +148,7 @@ gpt/
 
 ```bash
 git clone <your-repo-url>
-cd gpt
+cd kenya-legal-ai-
 python -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
@@ -177,9 +177,10 @@ docker run -p 6333:6333 qdrant/qdrant
 
 ### 4. Ingest legal data
 
-Run the full ingestion pipeline (Constitution first, then all other sources):
+Run the full ingestion pipeline from the repository root (Constitution first, then all other sources):
 
 ```bash
+cd /home/def-kef/kenya-legal-ai-
 python -m src.ingestion.mass_ingest
 ```
 
