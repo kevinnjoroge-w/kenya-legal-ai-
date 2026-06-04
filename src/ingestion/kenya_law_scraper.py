@@ -18,6 +18,7 @@ from bs4 import BeautifulSoup
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from src.config.settings import get_settings
+from src.ingestion.browser_fetcher import BrowserUseFetcher
 
 logger = logging.getLogger(__name__)
 
@@ -54,26 +55,33 @@ class KenyaLawScraper:
         self.gazettes_dir.mkdir(parents=True, exist_ok=True)
         self.metadata_dir = Path(settings.metadata_dir)
         self.metadata_dir.mkdir(parents=True, exist_ok=True)
+        self.browser_fetcher = BrowserUseFetcher()
 
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=2, max=15))
     async def _fetch_page(self, url: str) -> str:
-        """Fetch a page with retry logic."""
-        async with httpx.AsyncClient(
-            timeout=30.0,
-            follow_redirects=True,
-            headers={
-                "User-Agent": (
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                    "AppleWebKit/537.36 (KHTML, like Gecko) "
-                    "Chrome/115.0.0.0 Safari/537.36"
-                ),
-                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
-                "Accept-Language": "en-US,en;q=0.9",
-            },
-        ) as client:
-            response = await client.get(url)
-            response.raise_for_status()
-            return response.text
+        """Fetch a page with httpx, fallback to browser if 403 or error."""
+        try:
+            async with httpx.AsyncClient(
+                timeout=30.0,
+                follow_redirects=True,
+                headers={
+                    "User-Agent": (
+                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                        "AppleWebKit/537.36 (KHTML, like Gecko) "
+                        "Chrome/115.0.0.0 Safari/537.36"
+                    ),
+                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+                    "Accept-Language": "en-US,en;q=0.9",
+                },
+            ) as client:
+                response = await client.get(url)
+                if response.status_code == 403:
+                    logger.info(f"403 from httpx on {url}, using browser fallback...")
+                    return await self.browser_fetcher.fetch_html(url)
+                response.raise_for_status()
+                return response.text
+        except Exception as e:
+            logger.warning(f"httpx fetch failed on {url}: {e}, trying browser fallback...")
+            return await self.browser_fetcher.fetch_html(url)
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=2, max=15))
     async def _download_pdf(self, url: str, save_path: Path) -> bool:

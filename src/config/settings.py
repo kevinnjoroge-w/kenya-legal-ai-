@@ -43,6 +43,12 @@ class Settings(BaseSettings):
     laws_africa_api_key: str = ""
     laws_africa_base_url: str = "https://api.laws.africa/v3"
 
+    # ── Browser Automation (browser-use-sdk) ───────────────────────────────
+    browser_use_api_key: str = ""
+    browser_use_base_url: str = ""
+    browser_use_timeout: float = 120.0
+    browser_use_model: str = ""
+
     # ── Vector Database (Qdrant) ─────────────────────────────────────────
     qdrant_host: str = "localhost"
     qdrant_port: int = 6333

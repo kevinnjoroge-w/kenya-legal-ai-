@@ -16,6 +16,7 @@ import httpx
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from src.config.settings import get_settings
+from src.ingestion.browser_fetcher import BrowserUseFetcher
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +32,7 @@ class LawsAfricaClient:
         self.api_key = settings.laws_africa_api_key
         self.raw_data_dir = Path(settings.raw_data_dir) / "laws_africa"
         self.raw_data_dir.mkdir(parents=True, exist_ok=True)
+        self.browser_fetcher = BrowserUseFetcher()
 
         if not self.api_key:
             logger.warning(

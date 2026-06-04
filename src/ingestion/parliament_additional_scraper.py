@@ -21,6 +21,7 @@ from bs4 import BeautifulSoup
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from src.config.settings import get_settings
+from src.ingestion.browser_fetcher import BrowserUseFetcher
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +42,7 @@ class ParliamentAdditionalDocumentsScraper:
         self.committee_reports_dir = self.raw_data_dir / "committee_reports"
         self.standing_orders_dir = self.raw_data_dir / "standing_orders"
         self.metadata_dir = Path(self.settings.metadata_dir)
+        self.browser_fetcher = BrowserUseFetcher()
         
         for d in [
             self.order_papers_dir,
@@ -51,19 +53,25 @@ class ParliamentAdditionalDocumentsScraper:
         ]:
             d.mkdir(parents=True, exist_ok=True)
 
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
     async def _fetch_page(self, url: str) -> str:
-        """Fetch a page with retry."""
-        async with httpx.AsyncClient(
-            timeout=30.0,
-            follow_redirects=True,
-            headers={
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-            },
-        ) as client:
-            response = await client.get(url)
-            response.raise_for_status()
-            return response.text
+        """Fetch a page with httpx, fallback to browser if 403 or error."""
+        try:
+            async with httpx.AsyncClient(
+                timeout=30.0,
+                follow_redirects=True,
+                headers={
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                },
+            ) as client:
+                response = await client.get(url)
+                if response.status_code == 403:
+                    logger.info(f"403 from httpx on {url}, using browser fallback...")
+                    return await self.browser_fetcher.fetch_html(url)
+                response.raise_for_status()
+                return response.text
+        except Exception as e:
+            logger.warning(f"httpx fetch failed on {url}: {e}, trying browser fallback...")
+            return await self.browser_fetcher.fetch_html(url)
 
     async def fetch_order_papers(self, house: str = "national_assembly") -> List[Dict]:
         """

@@ -18,6 +18,7 @@ from bs4 import BeautifulSoup
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from src.config.settings import get_settings
+from src.ingestion.browser_fetcher import BrowserUseFetcher
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +45,7 @@ class JudiciaryScraper:
         self.docs_dir.mkdir(parents=True, exist_ok=True)
         self.metadata_dir = Path(settings.metadata_dir)
         self.metadata_dir.mkdir(parents=True, exist_ok=True)
+        self.browser_fetcher = BrowserUseFetcher()
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=2, max=15))
     async def _fetch_page(self, url: str) -> str:

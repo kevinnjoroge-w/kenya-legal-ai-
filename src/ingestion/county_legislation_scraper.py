@@ -27,6 +27,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 import sys, os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config.settings import get_settings
+from src.ingestion.browser_fetcher import BrowserUseFetcher
 
 logger = logging.getLogger(__name__)
 
@@ -72,6 +73,7 @@ class CountyLegislationScraper:
         self.meta_dir.mkdir(parents=True, exist_ok=True)
         self.checkpoint_path = self.meta_dir / "county_legislation_checkpoint.json"
         self.checkpoint = self._load_checkpoint()
+        self.browser_fetcher = BrowserUseFetcher()
         self.semaphore = asyncio.Semaphore(2)
         self.headers = {
             "User-Agent": (
@@ -92,14 +94,21 @@ class CountyLegislationScraper:
     def _save_checkpoint(self):
         self.checkpoint_path.write_text(json.dumps(self.checkpoint, indent=2))
 
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=3, max=15))
     async def _fetch(self, url: str) -> str:
-        async with httpx.AsyncClient(
-            timeout=30, headers=self.headers, follow_redirects=True
-        ) as client:
-            resp = await client.get(url)
-            resp.raise_for_status()
-            return resp.text
+        """Fetch with httpx, fallback to browser if 403 or error."""
+        try:
+            async with httpx.AsyncClient(
+                timeout=30, headers=self.headers, follow_redirects=True
+            ) as client:
+                resp = await client.get(url)
+                if resp.status_code == 403:
+                    logger.info(f"403 from httpx on {url}, using browser fallback...")
+                    return await self.browser_fetcher.fetch_html(url)
+                resp.raise_for_status()
+                return resp.text
+        except Exception as e:
+            logger.warning(f"httpx fetch failed on {url}: {e}, trying browser fallback...")
+            return await self.browser_fetcher.fetch_html(url)
 
     def _county_index_url(self, county_slug: str, doc_type: str, year: int) -> str:
         """Construct the URL for a county's doc-type year index."""
