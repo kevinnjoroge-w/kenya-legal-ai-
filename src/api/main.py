@@ -21,6 +21,8 @@ from src.generation.legal_generator import SubstantiveLegalGenerator
 from src.embedding.embedding_service import EmbeddingService
 from src.tools.disclaimer_engine import assess_disclaimer
 from src.tools.limitation_checker import check_limitation
+from src.db.session import engine
+from src.models.user import Base as UserBase
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -49,6 +51,13 @@ async def lifespan(app: FastAPI):
         legal_generator = None
 
     logger.info("Application startup complete")
+    # Ensure database tables exist
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(UserBase.metadata.create_all)
+        logger.info("Database tables ensured")
+    except Exception as e:
+        logger.error(f"Failed to ensure database tables: {e}")
     yield
     # Shutdown
     # Cleanup if needed
@@ -69,6 +78,25 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Include auth router
+from src.api.auth import router as auth_router
+app.include_router(auth_router, prefix="/api/v1/auth", tags=["auth"]) 
+
+# Include users router
+from src.api.users import router as users_router
+app.include_router(users_router, prefix="/api/v1/users", tags=["users"]) 
+
+# Include billing router
+from src.api.billing import router as billing_router
+app.include_router(billing_router, prefix="/api/v1/billing", tags=["billing"]) 
+
+# Additional auth endpoints (refresh, password reset)
+from src.api.auth_v2 import router as auth_v2_router
+app.include_router(auth_v2_router, prefix="/api/v1/auth", tags=["auth"]) 
+
+# M-Pesa endpoints
+from src.api.mpesa import router as mpesa_router
+app.include_router(mpesa_router, prefix="/api/v1/mpesa", tags=["mpesa"])
 # Configure CORS
 # When allow_credentials=True, allow_origins cannot be ["*"]
 cors_origins = [o.strip() for o in settings.cors_origins.split(",")]

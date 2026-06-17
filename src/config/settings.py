@@ -97,6 +97,18 @@ class Settings(BaseSettings):
     models_dir: str = "data/models"
     python_version: str = "3.11.0"
 
+    # ── Payments / Billing ───────────────────────────────────────────────
+    stripe_secret_key: str = ""
+    stripe_webhook_secret: str = ""
+    stripe_price_professional_monthly: str = ""
+    stripe_price_professional_yearly: str = ""
+
+    # ── M-Pesa (Safaricom) ───────────────────────────────────────────────
+    mpesa_consumer_key: str = ""
+    mpesa_consumer_secret: str = ""
+    mpesa_shortcode: str = ""
+    mpesa_passkey: str = ""
+
     # ── RAG Configuration ────────────────────────────────────────────────
     chunk_size: int = 1000          # characters per chunk
     chunk_overlap: int = 200        # overlap between chunks
