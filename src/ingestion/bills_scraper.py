@@ -24,6 +24,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 import sys, os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config.settings import get_settings
+from src.ingestion.browser_fetcher import BrowserUseFetcher
 
 logger = logging.getLogger(__name__)
 
@@ -68,6 +69,7 @@ class BillsScraper:
         self.meta_dir.mkdir(parents=True, exist_ok=True)
         self.checkpoint_path = self.meta_dir / "bills_checkpoint.json"
         self.checkpoint = self._load_checkpoint()
+        self.browser_fetcher = BrowserUseFetcher()
         self.semaphore = asyncio.Semaphore(2)
         self.headers = {
             "User-Agent": (

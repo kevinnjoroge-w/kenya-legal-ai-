@@ -18,6 +18,7 @@ import httpx
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from src.config.settings import get_settings
+from src.ingestion.browser_fetcher import BrowserUseFetcher
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +38,7 @@ class AfricanLIIScraper:
         self.cases_dir = self.raw_data_dir / "cases"
         self.legislation_dir = self.raw_data_dir / "legislation"
         self.metadata_dir = Path(self.settings.metadata_dir)
+        self.browser_fetcher = BrowserUseFetcher()
         
         for d in [self.cases_dir, self.legislation_dir, self.metadata_dir]:
             d.mkdir(parents=True, exist_ok=True)

@@ -25,6 +25,7 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config.settings import get_settings
+from src.ingestion.browser_fetcher import BrowserUseFetcher
 # Direct import for standalone testing
 import httpx
 from pathlib import Path
@@ -64,6 +65,7 @@ class LegalNoticesScraper:
         self.checkpoint_path = self.meta_dir / checkpoint_file
         
         self.scraper = KenyaLawScraper()  # Reuse PDF download
+        self.browser_fetcher = BrowserUseFetcher()
         self.semaphore = asyncio.Semaphore(2)  # Conservative concurrency
         self.checkpoint = self._load_checkpoint()
         self.headers = {
@@ -81,12 +83,19 @@ class LegalNoticesScraper:
     def _save_checkpoint(self):
         self.checkpoint_path.write_text(json.dumps(self.checkpoint, indent=2))
 
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=3, max=10))
     async def _fetch(self, url: str) -> str:
-        async with httpx.AsyncClient(timeout=30, headers=self.headers, follow_redirects=True) as client:
-            resp = await client.get(url)
-            resp.raise_for_status()
-            return resp.text
+        """Fetch with httpx, fallback to browser if 403 received."""
+        try:
+            async with httpx.AsyncClient(timeout=30, headers=self.headers, follow_redirects=True) as client:
+                resp = await client.get(url)
+                if resp.status_code == 403:
+                    logger.info(f"403 from httpx on {url}, using browser fallback...")
+                    return await self.browser_fetcher.fetch_html(url)
+                resp.raise_for_status()
+                return resp.text
+        except Exception as e:
+            logger.warning(f"httpx fetch failed on {url}: {e}, trying browser fallback...")
+            return await self.browser_fetcher.fetch_html(url)
 
     def _parse_year_links(self, html: str) -> List[str]:
         soup = BeautifulSoup(html, "lxml")
