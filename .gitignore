@@ -38,3 +38,5 @@ logs/
 qdrant_storage/
 .env
 .env.example
+
+.pytest_cache/

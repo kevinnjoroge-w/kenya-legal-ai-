@@ -31,7 +31,7 @@ BASE_URL = "http://kenyalaw.org"
 GAZETTE_ARCHIVE_URL = "http://kenyalaw.org/kl/index.php?id=gazette-online-archive"
 
 START_YEAR = 2024
-END_YEAR = 1963
+END_YEAR = 2024
 
 
 @dataclass

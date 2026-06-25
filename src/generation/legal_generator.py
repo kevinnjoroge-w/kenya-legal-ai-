@@ -162,289 +162,6 @@ into your argument naturally.
 
 # ─── ENHANCED TEMPLATES ────────────────────────────────────────────────────────
 
-SUBSTANTIVE_QUERY_TEMPLATE = """\
-## Retrieved Legal Sources:
-{context}
-
----
-
-## Your Question:
-{query}
-
-## Your Task:
-Construct a SUBSTANTIVE legal argument grounded in the sources above and Kenyan law generally. 
-This is not a summary. It is a reasoned legal opinion.
-
-Before writing, explicitly think through:
-1. What is the PRECISE legal question (often different from what's literally asked)?
-2. What precedent chain controls this? (Minimum 2–4 cases per major point)
-3. Is the law settled, or are courts split? If split, which line is winning?
-4. What is the strongest counterargument, and how do you overcome it?
-5. What practical pitfall should they know about?
-6. Where is my strongest critique of how the law is written or applied?
-
-## Structure Your Answer As:
-
-Paragraph 1: State the core legal principle directly. Don't bury it.
-
-Paragraphs 2–4: Walk through the precedent chain. Show how courts evolved their interpretation. 
-Explain the ratio of each case (WHY it matters) and how it applies to their situation.
-
-Paragraph N-2: Flag where the law is contested, unclear, or poorly drafted. This is your CRITICAL 
-OPINION. Don't hedge it.
-
-Paragraph N-1: Explain the practical reality. What do courts/officials actually do? Where does 
-theory diverge from practice?
-
-Paragraph N: Comparative note (if relevant) and final takeaway. One specific action they should take. 
-One question to ask a local counsel to validate your analysis.
-
-## Minimum Standards (Non-Negotiable):
-- Minimum 1200 words
-- At least 1 citation per 100 words (precedent chain, not just references)
-- At least 1 strong critical opinion
-- At least 1 practical example or scenario showing how the law applies
-- At least 1 statement of uncertainty or competing interpretation
-- No generic statements (every claim is grounded in a case or statute)
-- Final paragraph: specific, actionable takeaway
-
-## Answer:"""
-
-SUBSTANTIVE_CASE_ANALYSIS_TEMPLATE = """\
-## Retrieved Legal Sources:
-{context}
-
----
-
-## Case / Topic to Analyse:
-{query}
-
-## Your Task:
-Analyze this case or legal position like a senior advocate writing a litigation memo. This is 
-NOT a case summary. It is a critical evaluation of reasoning, precedent impact, and practical implications.
-
-## Structure Your Analysis As:
-
-**Section 1: The Core Legal Problem**
-State clearly: What was the actual legal issue? What was at stake? What prior law applied?
-Ground this in relevant precedent.
-
-**Section 2: Was the Judge's Reasoning Sound?**
-- What was the judge's ratio (the reasoning that controls)?
-- Is the logic internally consistent? (Flag logical gaps or leaps)
-- Did the judge ignore relevant precedent or distinguish it properly?
-- Where would you have argued differently?
-- Is there a stronger argument buried in the judgment's own logic?
-
-**Section 3: Precedent Impact (Ratio vs. Obiter)**
-- What is the BINDING principle from this case (ratio)?
-- What is persuasive but not binding (obiter)?
-- How does it fit the broader jurisprudence? Does it build on or disrupt earlier law?
-- Which earlier cases does it overrule or distinguish? (Trace the chain)
-- Could a later court distinguish it? Where is it vulnerable?
-
-**Section 4: Disagreement & Outliers**
-- Are there conflicting decisions from other courts on this issue?
-- Which line of reasoning is actually winning in practice?
-- If Kenyan courts diverged from Commonwealth precedent, is it justified?
-- What's the dissent's strongest argument? (If applicable)
-
-**Section 5: Practical Impact**
-- What does this case change about how the law is applied?
-- What precedent was overturned or narrowed?
-- What new liability/risk does it create?
-- How are practitioners actually responding?
-- What preparation is now required that wasn't before?
-
-**Section 6: Your Critical Opinion**
-- Stated plainly: Was this decision correct or problematic? Why?
-- If wrong, what was the better reasoning?
-- If right, what weaknesses exist in the judge's logic?
-- How would you argue this issue if it reaches the Supreme Court?
-
-**Section 7: Lasting Significance**
-- Is this case-specific or broadly applicable?
-- Is it likely to survive appellate scrutiny?
-- Will it be cited 10 years from now, or forgotten?
-- What issues does it leave unresolved?
-
-## Minimum Standards:
-- Minimum 1200 words
-- Precedent chain analyzed (not just cited)
-- Your critical opinion clearly stated
-- Practical implication explained with example
-- Realistic assessment of whether the decision will endure
-- No hedging on your own view
-
-## Analysis:"""
-
-SUBSTANTIVE_DEEP_RESEARCH_TEMPLATE = """\
-## Retrieved Legal Sources:
-{context}
-
----
-
-## Research Topic:
-{query}
-
-## Your Task:
-Build a COMPREHENSIVE scholarly legal argument. This is research-memo-level depth. 
-Think like you're educating a colleague or writing a Supreme Court brief.
-
-Do NOT use rigid structure. Build your argument methodically:
-
-**1. Foundational Principles**
-- What is the basic legal principle at stake?
-- Where does it come from (statute, common law, constitutional principle)?
-- Why does it matter? (What problem does it solve? What values does it protect?)
-- How is it defined? (Is there consensus, or is the definition contested?)
-
-**2. Precedent Chain**
-- Trace how courts have interpreted this principle over time
-- Show which cases built on or distinguished predecessors
-- Explain the RATIO (why the case mattered) and OBITER (nice-to-know reasoning)
-- Identify the "great cases" vs. the incremental developments
-- Show where courts got it right and where they went wrong
-
-**3. Points of Conflict & Unsettled Law**
-- Where do Kenyan courts split on interpretation?
-- What scenarios remain untested?
-- Where has the law not kept pace with social/economic reality?
-- What do other East African jurisdictions do differently?
-- What do Commonwealth courts say, and is Kenya's approach justified?
-
-**4. Critical Analysis**
-- Assess which line of reasoning is stronger (your view, not neutral)
-- Flag statutes that are poorly drafted
-- Identify precedents that should be overruled
-- Point out gaps in the law where Parliament should legislate
-- Explain where the law is being ignored in practice and why
-
-**5. Practical Implications**
-- What does this mean for someone actually dealing with this?
-- Where do theory and practice diverge?
-- What documentation/procedure is required?
-- What are the common mistakes?
-- What's the cheapest/fastest/safest route?
-
-**6. Comparative & Reform Perspective**
-- How do other jurisdictions handle this better?
-- What reforms would improve the law?
-- Are there model provisions or approaches worth citing?
-- How should the Supreme Court evolve the jurisprudence?
-
-## Minimum Standards:
-- Minimum 2000 words
-- Precedent chain analyzed (minimum 8–10 key cases)
-- At least 2 competing interpretations discussed
-- At least 1 strong critical opinion on weakness in existing law
-- Comparative note to other jurisdictions
-- Clear identification of unsettled areas
-- Practical example showing real-world application
-- Reform suggestion (even if speculative)
-- No generic statements
-
-## Answer:"""
-
-SUBSTANTIVE_DRAFTING_TEMPLATE = """\
-## Relevant Legal Sources:
-{context}
-
----
-
-## Drafting Request:
-{query}
-
-## Your Task:
-Draft the document (not as a form-filler, but as a lawyer who understands why each clause exists).
-
-For EVERY substantive clause:
-- Explain WHY it is necessary (what does it protect against?)
-- What problem does it solve?
-- What is the user risking if they omit it?
-- Where must they customize it to their specific facts?
-- What is the strongest counterargument, and how does your clause protect against it?
-
-Use annotations:
-- [CUSTOMISE: reason] — flags where the drafter MUST make a strategic choice
-- [NOTE: rationale] — explains why this clause is here
-- [RISK: consequence] — flags what happens if this clause is missing or weak
-- [NEGOTIATE: point] — flags a likely negotiation point
-
-Build the draft like you're advising a sophisticated client. Show your work.
-
-## Minimum Standards:
-- Full draft (not outline)
-- At least 30% of the word count is annotation/explanation
-- Every major clause has a [CUSTOMISE] or [RISK] flag
-- At least 1 clause includes a critical opinion ("This is poorly drafted in most agreements because...")
-- Precedent cited where relevant (e.g., "Courts in *XYZ v ABC* found that...so this clause protects you against that")
-- At least 1 strategic negotiation note
-
-## Draft:"""
-
-SUBSTANTIVE_PETITION_DRAFTING_TEMPLATE = """\
-## Retrieved Legal Sources:
-{context}
-
----
-
-## Petition Request:
-{query}
-
-## Your Task:
-Draft a PERSUASIVE constitutional petition. It must move the Court, not bore it.
-
-The facts must tell a story: Why does this constitutional violation MATTER? What irreparable 
-harm flows from it? Why is the petitioner uniquely affected?
-
-The law must reason from sources to conclusion: Show why the Constitution COMPELS the relief 
-you seek. Don't just assert "this violates Article X." Explain how, using precedent.
-
-## Structure (Not Rigid, But Informed):
-
-**I. Statement of Facts**
-- Open with what matters most (human impact, not chronology)
-- Tell the story of how the petitioner got here
-- Show the unreasonableness or unfairness of the situation
-- Make the Judge WANT the petitioner to win
-- Cite specific documents, dates, responses (or lack thereof)
-
-**II. The Constitutional Violation**
-- Name the provision(s) breached
-- Explain the principle protected by that provision
-- Apply that principle to the petitioner's facts
-- Show why there is no other adequate remedy
-- Distinguish this from cases where courts declined to intervene
-
-**III. The Respondent's Interests**
-- Acknowledge (briefly) what the Respondent might argue
-- Show why those interests do NOT justify the violation
-- Use precedent to show courts have rejected similar arguments
-- Propose a remedy that accommodates legitimate Respondent interests
-
-**IV. The Requested Relief**
-- Be specific (not "declare that the petitioner's rights were violated")
-- Explain why this relief restores the Constitution
-- Flag any practical implementation issues and propose solutions
-
-**V. Why This Court Should Act**
-- Show how this case clarifies the Constitution
-- Explain the broader impact (don't overstate, but be honest)
-- Point to unsettled law where the Court's guidance is needed
-
-## Minimum Standards:
-- Minimum 1500 words
-- Fact narrative is compelling (not just legal)
-- At least 3–4 key precedents cited and applied
-- At least 1 acknowledgement of counterargument + refutation
-- At least 1 reference to international law / comparative constitutional law (if relevant)
-- Remedy is specific and feasible
-- Critical opinion on the unreasonableness of the government's position is evident
-- Emotional resonance (not dry legal writing)
-
-## Draft:"""
-
 ADAPTIVE_QUERY_TEMPLATE = """\
 ## Retrieved Legal Sources:
 {context}
@@ -645,6 +362,18 @@ class SubstantiveLegalGenerator:
                 base_url="https://api.mistral.ai/v1",
                 timeout=120.0,
             )
+        elif settings.llm_provider == "google":
+            return OpenAI(
+                api_key=settings.google_api_key,
+                base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
+                timeout=120.0,
+            )
+        elif settings.llm_provider == "anthropic":
+            return OpenAI(
+                api_key=settings.anthropic_api_key,
+                base_url="https://api.anthropic.com/v1/",
+                timeout=120.0,
+            )
         else:
             return OpenAI(api_key=settings.openai_api_key, timeout=120.0)
 
@@ -686,16 +415,12 @@ class SubstantiveLegalGenerator:
             query, mode, temperature, max_tokens, history, **kwargs
         )
 
-        # Validate substantiveness
+        # Validate substantiveness — log only, no retry (retry doubles latency)
         is_substantive, feedback = self.validator.check_substantiveness(
             response["response"], mode, min_length=800
         )
-
         if not is_substantive:
-            logger.warning(f"Response validation failed: {feedback}. Retrying with stricter prompt...")
-            response = self._generate_with_retry(
-                query, mode, feedback, temperature, max_tokens, history, **kwargs
-            )
+            logger.info(f"Validation note (response still returned): {feedback}")
 
         # Extract action items
         response["action_items"] = self.validator.extract_action_items(response["response"])
@@ -764,69 +489,7 @@ class SubstantiveLegalGenerator:
             }
         except Exception as e:
             logger.error(f"Generation failed: {e}")
-            return {
-                "response": f"ERROR: {str(e)}",
-                "error": str(e),
-                "rag_used": rag_used,
-                "model": self.model,
-            }
-
-    def _generate_with_retry(self, query, mode, feedback, temperature, max_tokens, history, **kwargs) -> dict:
-        """Retry generation with explicit instruction to fix validation failures."""
-        system_prompt = SUBSTANTIVE_SYSTEM_PROMPT
-        template = self._get_direct_template(mode, query)
-        intent = self._infer_intent(query, mode)
-
-        # Build stricter user prompt
-        user_prompt = template.format(query=query, intent=intent, mode=mode)
-        user_prompt += f"""
-
-## IMPORTANT: Validation Feedback from Previous Attempt
-
-Your previous response was assessed as insufficiently substantive.
-
-Specific issues:
-{feedback}
-
-Please provide a revised answer that is more useful for the user's request.
-- Be more helpful and focused on the user's legal need.
-- Use evidence where available and say when you rely on general Kenyan legal knowledge.
-- If the user asked for analysis, compare arguments and explain uncertainty.
-- If the user asked for drafting, provide a full completed draft with formal wording suitable for filing, not just structure or notes.
-- If the user asked for procedural guidance, provide clear steps and likely pitfalls.
-"""
-
-        messages = [
-            {"role": "system", "content": system_prompt},
-            *history,
-            {"role": "user", "content": user_prompt},
-        ]
-
-        try:
-            completion = self.client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                temperature=min(temperature + 0.15, 0.9),  # Slightly higher temp for more detail
-                max_tokens=int(max_tokens * 1.3),  # Allow more tokens for retry
-            )
-            response_text = completion.choices[0].message.content
-
-            return {
-                "response": response_text,
-                "rag_used": self._rag_available,
-                "model": self.model,
-                "mode": mode,
-                "retry_attempted": True,
-            }
-        except Exception as e:
-            logger.error(f"Retry generation failed: {e}")
-            return {
-                "response": f"ERROR on retry: {str(e)}",
-                "error": str(e),
-                "rag_used": self._rag_available,
-                "model": self.model,
-                "retry_attempted": True,
-            }
+            raise
 
     def _retrieve_context(self, query: str, document_type: Optional[str] = None, court: Optional[str] = None) -> str:
         """Retrieve and format RAG context."""
@@ -851,15 +514,9 @@ Please provide a revised answer that is more useful for the user's request.
             return ""
 
     def _get_rag_template(self, mode: str, query: Optional[str] = None) -> str:
-        """Get RAG-mode template."""
-        if mode == "drafting" and query and re.search(r'\baffidavit\b', query, re.IGNORECASE):
-            return AFFIDAVIT_DRAFT_TEMPLATE
         return ADAPTIVE_QUERY_TEMPLATE
 
     def _get_direct_template(self, mode: str, query: Optional[str] = None) -> str:
-        """Get direct-mode template (no RAG)."""
-        if mode == "drafting" and query and re.search(r'\baffidavit\b', query, re.IGNORECASE):
-            return AFFIDAVIT_DRAFT_TEMPLATE
         return ADAPTIVE_DIRECT_TEMPLATE
 
     # ── Convenience Shortcuts ──────────────────────────────────────────────────

@@ -1,0 +1,225 @@
+@import "tailwindcss";
+
+/* =============================================================================
+   Kenya Legal AI — Design System (matches the static MVP)
+   Law-inspired green + gold palette, Inter body / Playfair Display headings.
+   ============================================================================= */
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    Roboto, sans-serif;
+  --font-serif: "Playfair Display", Georgia, "Times New Roman", serif;
+
+  /* Brand greens */
+  --color-brand-50: #f0f8f4;
+  --color-brand-100: #d9ede1;
+  --color-brand-200: #b3dbc4;
+  --color-brand-300: #84c2a1;
+  --color-brand-400: #6b9e78;
+  --color-brand-500: #4a7c59;
+  --color-brand-600: #3a6147;
+  --color-brand-700: #2d5a47;
+  --color-brand-800: #1e3a2e;
+  --color-brand-900: #14271f;
+
+  /* Gold accents (authority) */
+  --color-gold-300: #ecd98c;
+  --color-gold-400: #e0c25a;
+  --color-gold-500: #d4af37;
+  --color-gold-600: #b8860b;
+
+  /* Kenyan red */
+  --color-flag-red: #8b2635;
+
+  --shadow-soft: 0 4px 16px -2px rgba(45, 90, 71, 0.1);
+  --shadow-card: 0 10px 30px -10px rgba(45, 90, 71, 0.18);
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    margin: 0;
+    font-family: var(--font-sans);
+    color: #18181b;
+    background: linear-gradient(0deg, #fefefe 0%, #f7f9fa 100%);
+    background-attachment: fixed;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    line-height: 1.65;
+  }
+
+  html,
+  body,
+  #root {
+    min-height: 100%;
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-serif);
+    letter-spacing: -0.01em;
+  }
+
+  ::-webkit-scrollbar {
+    width: 9px;
+    height: 9px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #d4d4d8;
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #a1a1aa;
+  }
+}
+
+/* Base button as a utility so variants can compose it via @apply. */
+@utility btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5
+    text-sm font-semibold transition-all duration-200 disabled:cursor-not-allowed
+    disabled:opacity-50;
+}
+
+@layer components {
+  .btn-primary {
+    @apply btn text-white;
+    background: linear-gradient(135deg, #2d5a47 0%, #4a7c59 100%);
+    box-shadow: var(--shadow-soft);
+  }
+  .btn-primary:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 22px -6px rgba(45, 90, 71, 0.45);
+  }
+  .btn-gold {
+    @apply btn text-brand-900;
+    background: linear-gradient(135deg, #e0c25a 0%, #d4af37 100%);
+  }
+  .btn-gold:hover:not(:disabled) {
+    transform: translateY(-1px);
+  }
+  .btn-ghost {
+    @apply btn border border-brand-200 bg-white/70 text-brand-700;
+  }
+  .btn-ghost:hover:not(:disabled) {
+    @apply bg-brand-50;
+  }
+
+  /* Cards & inputs */
+  .card {
+    @apply rounded-2xl border border-brand-100 bg-white p-6 shadow-[0_4px_16px_-2px_rgba(45,90,71,0.08)];
+  }
+  .field {
+    @apply w-full rounded-xl border border-slate-200 bg-slate-50/60 px-4 py-2.5
+      text-sm text-slate-800 outline-none transition placeholder:text-slate-400
+      focus:border-brand-500 focus:bg-white focus:ring-2 focus:ring-brand-500/20;
+  }
+  .badge {
+    @apply inline-flex items-center gap-2 rounded-full border border-gold-500/40
+      bg-gold-500/10 px-4 py-1.5 text-xs font-semibold text-brand-800;
+  }
+}
+
+/* Lightweight markdown styling for assistant messages (no typography plugin). */
+.legal-markdown {
+  font-size: 0.875rem;
+  line-height: 1.7;
+  color: #334155;
+}
+.legal-markdown > :first-child {
+  margin-top: 0;
+}
+.legal-markdown > :last-child {
+  margin-bottom: 0;
+}
+.legal-markdown h1,
+.legal-markdown h2,
+.legal-markdown h3,
+.legal-markdown h4 {
+  font-family: var(--font-serif);
+  color: #1e3a2e;
+  font-weight: 700;
+  margin: 1.1em 0 0.5em;
+  line-height: 1.3;
+}
+.legal-markdown h1 {
+  font-size: 1.25rem;
+}
+.legal-markdown h2 {
+  font-size: 1.125rem;
+}
+.legal-markdown h3 {
+  font-size: 1rem;
+}
+.legal-markdown p {
+  margin: 0.6em 0;
+}
+.legal-markdown ul,
+.legal-markdown ol {
+  margin: 0.6em 0;
+  padding-left: 1.4em;
+}
+.legal-markdown ul {
+  list-style: disc;
+}
+.legal-markdown ol {
+  list-style: decimal;
+}
+.legal-markdown li {
+  margin: 0.25em 0;
+}
+.legal-markdown strong {
+  color: #1e3a2e;
+  font-weight: 600;
+}
+.legal-markdown a {
+  color: #2d5a47;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.legal-markdown blockquote {
+  border-left: 3px solid #d4af37;
+  background: #f0f8f4;
+  margin: 0.8em 0;
+  padding: 0.4em 1em;
+  border-radius: 0 0.5rem 0.5rem 0;
+  color: #3f3f46;
+}
+.legal-markdown code {
+  background: #f0f2f4;
+  padding: 0.1em 0.35em;
+  border-radius: 0.35rem;
+  font-size: 0.85em;
+}
+.legal-markdown pre {
+  background: #14271f;
+  color: #f0f8f4;
+  padding: 0.9em 1em;
+  border-radius: 0.6rem;
+  overflow-x: auto;
+  margin: 0.8em 0;
+}
+.legal-markdown pre code {
+  background: transparent;
+  padding: 0;
+  color: inherit;
+}
+.legal-markdown table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.8em 0;
+  font-size: 0.85em;
+}
+.legal-markdown th,
+.legal-markdown td {
+  border: 1px solid #e4e4e7;
+  padding: 0.45em 0.7em;
+  text-align: left;
+}
+.legal-markdown th {
+  background: #f0f8f4;
+  color: #1e3a2e;
+}

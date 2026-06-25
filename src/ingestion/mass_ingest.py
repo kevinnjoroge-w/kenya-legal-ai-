@@ -21,7 +21,7 @@ from src.ingestion.tribunals_scraper import run_tribunals_ingestion
 from src.ingestion.hansard_scraper import run_hansard_ingestion
 from src.ingestion.county_legislation_scraper import run_county_legislation_ingestion
 from src.ingestion.treaties_scraper import run_treaties_ingestion
-from src.ingestion.kenya_gazette_scraper import run_kenya_gazette_ingestion
+
 from src.ingestion.repealed_statutes_scraper import run_repealed_statutes_ingestion
 from src.ingestion.elections_scraper import run_elections_ingestion
 
@@ -105,16 +105,7 @@ async def run_mass_ingestion():
         logger.error(f"Legal Notices ingestion failed: {e}")
 
     # ─────────────────────────────────────────────────────────────────
-    # 5. Kenya Gazette Online Archive (historical, kenyalaw.org/kl)
-    # ─────────────────────────────────────────────────────────────────
-    logger.info("=== [5] Kenya Gazette Archive ===")
-    try:
-        await run_kenya_gazette_ingestion()
-    except Exception as e:
-        logger.error(f"Kenya Gazette Archive ingestion failed: {e}")
-
-    # ─────────────────────────────────────────────────────────────────
-    # 6. Bulk Judgments + New Portal Gazettes (new.kenyalaw.org)
+    # 5. Bulk Judgments + New Portal Gazettes (new.kenyalaw.org)
     # ─────────────────────────────────────────────────────────────────
     logger.info("=== [6] Bulk Judgments + Portal Gazettes ===")
     try:
